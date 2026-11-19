@@ -94,6 +94,9 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   le rechargement complet toutes les 25 secondes.
 - **Bon vide affiché « Livré » :** confirmé dans `v_bons`, le statut passe à
   `livre` quand la somme des RAL vaut 0, y compris sans aucune ligne.
+  → Corrigé par `supabase/003_bon_vide.sql` (vue) et dans `solde()` de la
+  page comptoir (à reporter dans `app.js`) : un bon sans ligne suit la règle
+  des bons en attente (attente / surveiller / retard).
 - `trace_entete()` est `security definer` sans `search_path` fixé, à la
   différence de `trace_mouvement()`.
 

@@ -1128,7 +1128,8 @@ function prepaL(l) { return Math.max(0, l.exp - l.liv); }       // prêt, pas pa
 function ralD(d) { return d.lignes.reduce(function (s, l) { return s + ralL(l); }, 0); }
 function prepaD(d) { return d.lignes.reduce(function (s, l) { return s + prepaL(l); }, 0); }
 function livD(d) { return d.lignes.reduce(function (s, l) { return s + l.liv; }, 0); }
-function solde(d) { return ralD(d) === 0; }
+// Un bon sans aucune ligne n'est pas soldé : il reste à compléter.
+function solde(d) { return d.lignes.length > 0 && ralD(d) === 0; }
 function nivAge(a) { return a < VERT ? 'g' : (a <= ORANGE ? 'o' : 'r'); }
 
 /* L'état d'une ligne. La préparation passe devant : c'est l'action en cours,
