@@ -20,7 +20,7 @@ décisions est dans [`docs/MEMO.md`](docs/MEMO.md).
 | Chemin | Rôle |
 |---|---|
 | `site/comptoir/index.html` | Outil du comptoir : saisie, pointage, impression du bon de livraison |
-| `site/client/index.html` | Espace client SDIS : consultation, récapitulatif des articles en attente |
+| `site/client/index.html` | Espace client SDIS : consultation, récapitulatif des articles en attente, réception des livraisons |
 | `supabase/000_schema_actuel.sql` | Schéma actuel de la base (export du 2026-11-19, voir plus bas) |
 | `docs/MEMO.md` | Mémo de projet |
 
@@ -97,6 +97,12 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   → Corrigé par `supabase/003_bon_vide.sql` (vue) et dans `solde()` de la
   page comptoir : un bon sans ligne suit la règle
   des bons en attente (attente / surveiller / retard).
+- **Réception côté SDIS :** `supabase/004_reception.sql` ajoute la quantité
+  réceptionnée par ligne (qui, quand), les personnes de la réception
+  (`receptionnaires`, codes 1 à 6 en attendant les prénoms) et le statut
+  `receptionne`. Le compte SDIS n'écrit que par les fonctions
+  `receptionner()` / `receptionner_bon()`, qui ne touchent que la réception.
+  Les prénoms : `update receptionnaires set nom = 'Prénom' where code = '1';`
 - `trace_entete()` est `security definer` sans `search_path` fixé, à la
   différence de `trace_mouvement()`.
 

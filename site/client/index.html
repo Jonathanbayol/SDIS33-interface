@@ -240,6 +240,7 @@ tbody tr:hover td{background:rgba(90,160,255,.05)}
 .b-g{background:var(--green-f)} .b-o{background:var(--orange-f)}
 .b-r{background:var(--red-f)}   .b-b{background:var(--acc)}
 .b-n{background:var(--tx3)}
+.b-v{background:#6A4FD0}
 .vide{padding:56px 24px;text-align:center;color:var(--tx3);font-size:13.5px;line-height:1.7}
 
 /* ---- liste des bons (onglet Suivi) ------------------------------------- */
@@ -334,6 +335,42 @@ tbody tr:hover td{background:rgba(90,160,255,.05)}
 .chev{color:var(--tx3);transition:transform var(--t-etat) var(--e-sortie)}
 .bonl[aria-expanded="true"] .chev{transform:rotate(90deg)}
 .detail{padding:2px 20px 18px;animation:monte var(--t-etat) var(--e-sortie) both}
+
+/* ---- réception ------------------------------------------------------------ */
+.recu{color:#9C86F0}
+:root[data-theme="light"] .recu{color:#5B3FC4}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .recu{color:#5B3FC4}}
+.qui{padding:16px 20px 20px}
+.qui h3{margin-bottom:12px}
+.quil{display:flex;flex-wrap:wrap;gap:10px}
+.quib{min-width:64px;padding:14px 20px;border-radius:14px;background:var(--fill);
+  font-size:18px;font-weight:700;border:1px solid var(--sep);
+  transition:background var(--t-clic) ease,transform var(--t-clic) ease,border-color var(--t-clic) ease}
+.quib:hover{border-color:var(--acc);transform:translateY(-1px)}
+.quib:active{transform:scale(.97)}
+.quiok{display:flex;align-items:center;gap:12px;padding:14px 20px 18px;flex-wrap:wrap}
+.quiav{display:inline-grid;place-items:center;min-width:34px;height:34px;padding:0 8px;
+  border-radius:99px;background:#6A4FD0;color:#fff;font-weight:700}
+.bouton.petit{padding:7px 14px;font-size:12.5px;margin-left:auto}
+.recmsg{margin:0 0 16px;padding:12px 16px;border-radius:12px;background:var(--card2);
+  border:1px solid var(--sep);font-size:13px;color:var(--green)}
+.rbon{border-top:1px solid var(--sep2);padding:14px 20px 18px;margin-top:14px}
+.rbh{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+.rbh .bdate{margin-left:auto}
+.rbon tr.fini td{color:var(--tx3)}
+.rbon td.trace{font-size:11.5px;color:var(--tx3);white-space:nowrap}
+.qrec{display:inline-flex;align-items:center;gap:4px}
+.qrec button{width:28px;height:28px;border-radius:50%;background:var(--fill);font-size:16px;
+  line-height:1;color:var(--tx2)}
+.qrec button:hover:not(:disabled){color:var(--tx);background:var(--card2)}
+.qrec input{width:52px;text-align:center;font:inherit;font-weight:700;padding:6px 4px;
+  border-radius:9px;border:1px solid var(--sep);background:var(--fill);color:var(--tx);
+  font-variant-numeric:tabular-nums}
+.qrec input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-halo)}
+.qrec :disabled{opacity:.4;cursor:not-allowed}
+.ract{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+.ract .bouton:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.recerr{margin:10px 0 0;font-size:12.5px;color:var(--red);font-weight:500}
 
 /* ---- bouton d'action principal ----------------------------------------- */
 .bouton{
@@ -546,6 +583,7 @@ body{
       <nav class="nav" id="nav">
         <button data-vue="bord" aria-current="true">Tableau de bord</button>
         <button data-vue="suivi" aria-current="false">Suivi</button>
+        <button data-vue="reception" aria-current="false">R&eacute;ception</button>
       </nav>
       <button class="theme" id="theme" title="Changer de th&egrave;me"
               style="margin-left:auto"></button>
@@ -571,11 +609,11 @@ document.getElementById('logo2').src = LOGO;
    SDIS 33 — Shipping interface
    Espace client de suivi des livraisons BARRAULT Le Haillan.
 
-   Cette page ne fait que LIRE, et seulement une fois connectée au compte
-   Supabase du client (CONFIG.compte) : la base refuse toute lecture sans
-   connexion. Aucun bouton, aucun chemin de code n'écrit en
-   base : le client consulte, il ne corrige pas. Les corrections se font au
-   comptoir, là où quelqu'un a la liasse papier sous les yeux.
+   Cette page LIT, et seulement une fois connectée au compte Supabase du
+   client (CONFIG.compte) : la base refuse toute lecture sans connexion.
+   Une seule écriture : la quantité reçue, dans l'onglet Réception, par deux
+   fonctions de la base qui ne peuvent rien modifier d'autre. Les corrections
+   des bons se font au comptoir, là où quelqu'un a la liasse sous les yeux.
    =========================================================================== */
 var CONFIG = {
   url: 'https://czdrfqhuamifuzznpqcq.supabase.co',
@@ -609,6 +647,27 @@ function api(chemin, rejoue) {
       var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e;
     });
     return r.json();
+  });
+}
+
+/* Seule écriture de la page : la réception, par deux fonctions de la base
+   qui ne touchent QUE la quantité reçue (voir supabase/004_reception.sql). */
+function rpc(fn, corps, rejoue) {
+  return jeton().then(function (j) {
+    return fetch(CONFIG.url + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: { 'apikey': CONFIG.cle, 'Authorization': 'Bearer ' + j,
+                 'Content-Type': 'application/json' },
+      body: JSON.stringify(corps)
+    });
+  }).then(function (r) {
+    if (r.status === 401 && session && !rejoue) {
+      return renouveler().then(function () { return rpc(fn, corps, true); });
+    }
+    if (!r.ok) return r.text().then(function (t) {
+      var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e;
+    });
+    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
   });
 }
 
@@ -665,6 +724,9 @@ function jeton() {
 var BONS = [], LIGNES = {}, MVT = [], chargement = true, erreur = null;
 var vue = 'bord', periode = 90, ouvert = null, tableaux = {}, majLe = null;
 var q = '';              // texte de recherche dans l'onglet Suivi
+var RECEP = [], MVTR = []; // personnes de la réception, dernières réceptions
+var SAISIE = {};         // quantités reçues tapées, pas encore enregistrées
+var recMsg = null, recErr = {}, recEnvoi = null;
 var ouvLivres = false;   // les bons livrés sont repliés tant qu'on ne les demande pas
 
 /* --------------------------------------------------------------------------
@@ -735,8 +797,11 @@ function ouvrir() {
   document.getElementById('appli').hidden = false;
   charger(false);
   // Onglet caché : pas de rechargement ; on rattrape au retour.
-  setInterval(function () { if (!document.hidden) charger(true); }, CONFIG.rafraichirSecondes * 1000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) charger(true); });
+  setInterval(function () { if (!document.hidden && !receptionOccupee()) charger(true); },
+              CONFIG.rafraichirSecondes * 1000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && !receptionOccupee()) charger(true);
+  });
 }
 
 document.getElementById('cle').addEventListener('submit', function (e) {
@@ -817,8 +882,21 @@ function charger(silencieux) {
   return Promise.all([
     api('v_bons?select=*&order=date_bon.desc'),
     api('v_lignes?select=*&order=ordre.asc'),
-    api('v_mouvements?select=*&champ=eq.qte_livree&order=au.desc')
+    api('v_mouvements?select=*&champ=eq.qte_livree&order=au.desc'),
+    // Réception : absente tant que le script 004 n'est pas joué. On ne bloque
+    // pas le reste de la page pour autant.
+    api('receptionnaires?select=code,nom&actif=is.true&order=code').catch(function () { return null; }),
+    api('v_mouvements?select=*&champ=eq.qte_receptionnee&order=au.desc&limit=40')
+      .catch(function () { return null; })
   ]).then(function (r) {
+    RECEP = r[3] || [];
+    MVTR = (r[4] || []).map(function (m) {
+      return { au: m.au, ref: m.reference, des: m.designation || '',
+               num: (m.exercice ? m.exercice + '/' : '') + m.num_bon,
+               nat: natureBon(m), vref: m.vreference || '—',
+               avant: Number(m.avant) || 0, apres: Number(m.apres) || 0,
+               qui: m.operateur || '' };
+    });
     BONS = (r[0] || []).map(function (b) {
       return {
         id: b.id,
@@ -847,6 +925,8 @@ function charger(silencieux) {
         du: Number(l.qte_due) || 0,
         exp: Number(l.qte_expediee) || 0,
         liv: Number(l.qte_livree) || 0,
+        rec: Number(l.qte_receptionnee) || 0,
+        recPar: l.receptionne_par || '', recLe: l.receptionne_le || '',
         prepa: Math.max(0, (Number(l.qte_expediee) || 0) - (Number(l.qte_livree) || 0)),
         ral: Math.max(0, (Number(l.qte_due) || 0) - (Number(l.qte_livree) || 0))
       });
@@ -886,7 +966,9 @@ function mvtPeriode() {
   var t0 = depuis(periode);
   return MVT.filter(function (m) { return new Date(m.au) >= t0; });
 }
-function enCours() { return BONS.filter(function (b) { return b.statut !== 'livre'; }); }
+/* « Réceptionné » est un bon livré dont le SDIS a confirmé la réception. */
+function livre(b) { return b.statut === 'livre' || b.statut === 'receptionne'; }
+function enCours() { return BONS.filter(function (b) { return !livre(b); }); }
 
 /* Dernier mouvement de chaque bon : sert à dater le solde. */
 function dernierMvt() {
@@ -898,7 +980,7 @@ function dernierMvt() {
 function delaiMoyenSolde() {
   var fin = dernierMvt(), total = 0, n = 0;
   bonsPeriode().forEach(function (b) {
-    if (b.statut !== 'livre' || !fin[b.id]) return;
+    if (!livre(b) || !fin[b.id]) return;
     var j = (new Date(fin[b.id]) - new Date(b.date)) / 86400000;
     if (j >= 0 && j < 400) { total += j; n++; }
   });
@@ -1212,7 +1294,7 @@ function vueBord() {
   var taux = pourcent(ex, du);
   var delai = delaiMoyenSolde();
   var jours = parJour(), tr = tranchesAge(), sem = parSemaine(12), top = topAttente(8);
-  var derniers = BONS.filter(function (b) { return b.statut === 'livre'; }).slice(0, 6);
+  var derniers = BONS.filter(livre).slice(0, 6);
   var fin = dernierMvt();
 
   var h = '<div class="grille g4" style="margin-bottom:16px">';
@@ -1299,10 +1381,10 @@ function vueBord() {
    =========================================================================== */
 /* Quatre états, et le mot dit exactement ce qui se passe côté Barrault :
    « en préparation » veut dire que la pièce est là et attend de partir. */
-var LIB = { livre: 'Livr&eacute;', partiel: 'Livr&eacute; partiellement',
+var LIB = { livre: 'Livr&eacute;', receptionne: 'R&eacute;ceptionn&eacute;', partiel: 'Livr&eacute; partiellement',
             prepa: 'En pr&eacute;paration', attente: 'En attente',
             retard: 'En retard', surveiller: '&Agrave; surveiller' };
-var CLS = { livre: 'b-g', partiel: 'b-o', prepa: 'b-b', attente: 'b-n',
+var CLS = { livre: 'b-g', receptionne: 'b-v', partiel: 'b-o', prepa: 'b-b', attente: 'b-n',
             retard: 'b-r', surveiller: 'b-o' };
 
 /* ===========================================================================
@@ -1390,8 +1472,8 @@ function vueSuivi() {
   // Ce qui reste dû se lit d'abord, dans l'ordre où l'attente presse ; ce qui
   // est livré n'attend plus rien et se range derrière un dépliant. Le client
   // ouvre sa page et voit ce qu'on lui doit, pas ce qu'il a déjà reçu.
-  var dus = vus.filter(function (b) { return b.statut !== 'livre'; });
-  var livres = vus.filter(function (b) { return b.statut === 'livre'; });
+  var dus = vus.filter(function (b) { return !livre(b); });
+  var livres = vus.filter(livre);
 
   // Une recherche qui ne trouve que des bons livrés doit les montrer : sinon
   // l'écran répond « aucun bon en attente » alors qu'il en tient un derrière
@@ -1444,16 +1526,19 @@ function detailBon(b) {
   var h = '<div class="detail"><div class="tw"><table><thead><tr>'
     + '<th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
     + '<th class="n">Command&eacute;</th><th class="n">Livr&eacute;</th>'
+    + '<th class="n">R&eacute;ceptionn&eacute;</th>'
     + '<th class="n">En pr&eacute;paration</th>'
     + '<th class="n">Reste</th></tr></thead><tbody>';
   if (!lg.length) {
-    h += '<tr><td colspan="6" style="color:var(--tx3)">Aucune ligne sur ce bon.</td></tr>';
+    h += '<tr><td colspan="7" style="color:var(--tx3)">Aucune ligne sur ce bon.</td></tr>';
   }
   lg.forEach(function (l) {
     h += '<tr><td class="ref">' + refHtml(l.ref) + '</td>'
       + '<td class="des">' + esc(l.des) + '</td>'
       + '<td class="n">' + l.du + '</td>'
       + '<td class="n">' + (l.liv > 0 ? '<b style="color:var(--green)">' + l.liv + '</b>'
+                                      : '<span style="color:var(--tx3)">&mdash;</span>') + '</td>'
+      + '<td class="n"' + titreRec(l) + '>' + (l.rec > 0 ? '<b class="recu">' + l.rec + '</b>'
                                       : '<span style="color:var(--tx3)">&mdash;</span>') + '</td>'
       + '<td class="n">' + (l.prepa > 0 ? '<b style="color:var(--acc-hi)">' + l.prepa + '</b>'
                                         : '<span style="color:var(--tx3)">&mdash;</span>') + '</td>'
@@ -1472,6 +1557,189 @@ function detailBon(b) {
         + (b.prepa > 1 ? 's' : '') + ' &agrave; partir</b>' : '')
     + '</p></div>';
   return h;
+}
+
+
+/* ===========================================================================
+   Écran 4 — réception
+
+   Les bons dont Barrault a livré des pièces que la réception n'a pas encore
+   pointées. La personne de la réception s'identifie (codes 1 à 6 pour
+   l'instant, prénoms plus tard), tape ce qu'elle a réellement reçu, et
+   Barrault le voit aussitôt dans la colonne « Réceptionné » du comptoir.
+   Chaque réception est tracée : qui, et quand.
+   =========================================================================== */
+var RECEP_MINUTES = 15;   // au-delà sans action, on redemande qui réceptionne
+
+function quiRecep() {
+  var n = memoire('sdis-recep-qui'), t = Number(memoire('sdis-recep-t')) || 0;
+  if (!n || Date.now() - t > RECEP_MINUTES * 60000) return null;
+  return RECEP.some(function (x) { return x.nom === n; }) ? n : null;
+}
+function toucherRecep() { memoire('sdis-recep-t', String(Date.now())); }
+
+function aReceptionner() {
+  return BONS.filter(function (b) {
+    return (LIGNES[b.id] || []).some(function (l) { return l.liv > l.rec; });
+  });
+}
+
+function titreRec(l) {
+  if (!l.rec) return '';
+  var t = l.recPar === 'reprise' ? 'Livré avant la mise en service de la réception'
+        : 'Réceptionné par ' + (l.recPar || '?')
+          + (l.recLe ? ' le ' + dateFr(l.recLe) + ' à ' + heureFr(l.recLe) : '');
+  return ' title="' + esc(t) + '"';
+}
+
+function vueReception() {
+  var qui = quiRecep();
+  var h = '<section class="carte" style="margin-bottom:16px"><div class="ct"><div>'
+    + '<h2>R&eacute;ception des livraisons</h2>'
+    + '<div class="sous">Indiquez les quantit&eacute;s r&eacute;ellement re&ccedil;ues. '
+    + 'Barrault les voit aussit&ocirc;t.</div></div></div>';
+  if (!RECEP.length) {
+    return h + '<div class="vide">La r&eacute;ception n\'est pas encore activ&eacute;e '
+      + 'sur cet espace.</div></section>';
+  }
+  if (!qui) {
+    h += '<div class="qui"><h3>Qui r&eacute;ceptionne&nbsp;?</h3><div class="quil">'
+      + RECEP.map(function (x) {
+          return '<button class="quib" data-qui="' + esc(x.nom) + '">' + esc(x.nom) + '</button>';
+        }).join('') + '</div></div></section>';
+  } else {
+    h += '<div class="quiok"><span class="quiav">' + esc(qui) + '</span>'
+      + '<span>R&eacute;ception par <b>' + esc(qui) + '</b></span>'
+      + '<button class="bouton calme petit" id="quichg">Changer</button></div></section>';
+  }
+  if (recMsg) h += '<p class="recmsg">' + recMsg + '</p>';
+
+  var lot = aReceptionner();
+  h += '<section class="carte" style="margin-bottom:16px;padding-bottom:4px"><div class="ct"><div>'
+    + '<h2>&Agrave; r&eacute;ceptionner</h2><div class="sous">' + lot.length + ' bon'
+    + (lot.length > 1 ? 's' : '') + ' avec des pi&egrave;ces livr&eacute;es pas encore point&eacute;es'
+    + (qui ? '' : ' &middot; identifiez-vous pour saisir') + '</div></div></div>';
+  if (!lot.length) {
+    h += '<div class="vide">Rien &agrave; r&eacute;ceptionner pour le moment.</div>';
+  } else {
+    lot.forEach(function (b) { h += blocReception(b, qui); });
+  }
+  h += '</section>';
+  return h + historiqueReception();
+}
+
+function blocReception(b, qui) {
+  var lg = (LIGNES[b.id] || []).filter(function (l) { return l.liv > 0; })
+    .sort(function (x, y) { return x.ordre - y.ordre; });
+  var off = !qui || recEnvoi === b.id ? ' disabled' : '';
+  var h = '<div class="rbon"><div class="rbh"><span class="bnum"><span class="nat">' + b.nat
+    + '</span>' + esc(b.bon) + '</span><span class="bvr">' + esc(b.vref) + '</span>'
+    + '<span class="bdate">' + isoEnFr(b.date) + '</span></div>'
+    + '<div class="tw"><table><thead><tr><th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
+    + '<th class="n">Command&eacute;</th><th class="n">Livr&eacute;</th>'
+    + '<th class="n">Re&ccedil;u</th><th>Point&eacute;</th></tr></thead><tbody>';
+  lg.forEach(function (l) {
+    var v = SAISIE[l.id] !== undefined ? SAISIE[l.id] : String(l.rec);
+    var fini = l.rec >= l.liv;
+    h += '<tr' + (fini ? ' class="fini"' : '') + '><td class="ref">' + refHtml(l.ref) + '</td>'
+      + '<td class="des">' + esc(l.des) + '</td>'
+      + '<td class="n">' + l.du + '</td>'
+      + '<td class="n"><b style="color:var(--green)">' + l.liv + '</b></td>'
+      + '<td class="n"><span class="qrec"><button data-pas="-1" data-l="' + l.id + '"' + off
+        + ' aria-label="Un de moins">&minus;</button>'
+      + '<input data-rec="' + l.id + '" value="' + esc(v) + '" '
+        + 'inputmode="numeric" autocomplete="off" aria-label="Quantit&eacute; re&ccedil;ue"' + off + '>'
+      + '<button data-pas="1" data-l="' + l.id + '"' + off + ' aria-label="Un de plus">+</button>'
+      + '</span></td>'
+      + '<td class="trace">' + (l.rec && l.recPar !== 'reprise' ? esc(l.recPar) + ' &middot; '
+          + dateFr(l.recLe) + ' ' + heureFr(l.recLe)
+          : l.recPar === 'reprise' ? 'avant mise en service' : '&mdash;') + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if (recErr[b.id]) h += '<p class="recerr">' + esc(recErr[b.id]) + '</p>';
+  h += '<div class="ract">'
+    + '<button class="bouton calme" data-tout="' + b.id + '"' + off + '>Tout est arriv&eacute;</button>'
+    + '<button class="bouton" data-enreg="' + b.id + '"' + off + '>'
+    + (recEnvoi === b.id ? 'Enregistrement&hellip;' : 'Enregistrer la r&eacute;ception') + '</button>'
+    + '</div></div>';
+  return h;
+}
+
+function historiqueReception() {
+  var lst = MVTR.filter(function (m) { return m.apres !== m.avant; });
+  var h = '<section class="carte"><div class="ct"><div><h2>Derni&egrave;res r&eacute;ceptions</h2>'
+    + '<div class="sous">Qui a r&eacute;ceptionn&eacute; quoi, et quand</div></div></div>';
+  if (!lst.length) return h + '<div class="vide">Aucune r&eacute;ception enregistr&eacute;e.</div></section>';
+  h += '<div class="tw"><table><thead><tr><th>Quand</th><th>Bon</th><th>R&eacute;f&eacute;rence</th>'
+    + '<th>D&eacute;signation</th><th class="n">Re&ccedil;u</th><th>Par</th></tr></thead><tbody>';
+  lst.forEach(function (m) {
+    var d = m.apres - m.avant;
+    h += '<tr><td class="bdate">' + dateFr(m.au) + ' ' + heureFr(m.au) + '</td>'
+      + '<td class="bnum"><span class="nat">' + m.nat + '</span>' + esc(m.num) + '</td>'
+      + '<td class="ref">' + refHtml(m.ref) + '</td><td class="des">' + esc(m.des) + '</td>'
+      + '<td class="n"><b class="recu">' + (d > 0 ? '+' : '&minus;') + Math.abs(d) + '</b></td>'
+      + '<td>' + esc(m.qui) + '</td></tr>';
+  });
+  return h + '</tbody></table></div></section>';
+}
+
+function lireQte(l) {
+  var t = SAISIE[l.id];
+  if (t === undefined) return l.rec;
+  t = String(t).trim();
+  return /^\d+$/.test(t) ? Number(t) : NaN;
+}
+
+function texteSeul(html) { var d = document.createElement('div'); d.innerHTML = html; return d.textContent; }
+
+function enregistrerReception(bonId, tout) {
+  var qui = quiRecep(); if (!qui) { rendre(); return; }
+  toucherRecep();
+  var b = BONS.filter(function (x) { return x.id === bonId; })[0]; if (!b) return;
+  var lg = (LIGNES[bonId] || []).filter(function (l) { return l.liv > 0; });
+  var travail;
+  delete recErr[bonId];
+  if (tout) {
+    travail = function () { return rpc('receptionner_bon', { p_bon: bonId, p_qui: qui }); };
+  } else {
+    var aFaire = [], faux = null;
+    lg.forEach(function (l) {
+      var v = lireQte(l);
+      if (isNaN(v) || v < 0 || v > l.liv) { faux = faux || l; return; }
+      if (v !== l.rec) aFaire.push({ l: l, v: v });
+    });
+    if (faux) {
+      recErr[bonId] = faux.ref + ' : la quantité reçue doit être un nombre entre 0 et '
+        + faux.liv + ' (quantité livrée).';
+      rendre(); return;
+    }
+    if (!aFaire.length) { recErr[bonId] = 'Aucune quantité modifiée.'; rendre(); return; }
+    travail = function () {
+      return aFaire.reduce(function (p, x) {
+        return p.then(function () {
+          return rpc('receptionner', { p_ligne: x.l.id, p_qte: x.v, p_qui: qui });
+        });
+      }, Promise.resolve());
+    };
+  }
+  recEnvoi = bonId; rendre();
+  travail().then(function () {
+    lg.forEach(function (l) { delete SAISIE[l.id]; });
+    recMsg = 'R&eacute;ception du ' + b.nat + ' ' + esc(b.bon) + ' enregistr&eacute;e par '
+      + esc(qui) + ' &agrave; ' + heureFr(new Date()) + '.';
+    return charger(true);
+  }).catch(function (e) {
+    recErr[bonId] = /pas_plus_que_livre/.test(e.message || '')
+      ? 'On ne peut pas recevoir plus que ce qui a été livré.'
+      : 'Réception non enregistrée. ' + texteSeul(humain(e));
+  }).then(function () { recEnvoi = null; rendre(); });
+}
+
+/* La page se redessine toute seule toutes les 2 minutes : pas pendant qu'on
+   tape une quantité ni pendant un enregistrement. */
+function receptionOccupee() {
+  var a = document.activeElement;
+  return vue === 'reception' && !!(recEnvoi || (a && a.dataset && a.dataset.rec));
 }
 
 /* ===========================================================================
@@ -1598,8 +1866,8 @@ function rendre() {
   var q0 = document.getElementById('q');
   var curseur = (q0 && document.activeElement === q0) ? q0.selectionStart : null;
 
-  var h = (vue === 'suivi' ? '' : barreFiltres());
-  h += vue === 'bord' ? vueBord() : vueSuivi();
+  var h = (vue === 'bord' ? barreFiltres() : '');
+  h += vue === 'bord' ? vueBord() : vue === 'reception' ? vueReception() : vueSuivi();
   el.innerHTML = h;
 
   if (curseur !== null) {
@@ -1639,6 +1907,26 @@ document.getElementById('ecran').addEventListener('click', function (e) {
   var b = e.target.closest('[data-bon]');
   if (b) { ouvert = ouvert === b.dataset.bon ? null : b.dataset.bon; rendre(); return; }
   if (e.target.closest('#recap')) { imprimer(); return; }
+  var qb = e.target.closest('[data-qui]');
+  if (qb) { memoire('sdis-recep-qui', qb.dataset.qui); toucherRecep(); recMsg = null; rendre(); return; }
+  if (e.target.closest('#quichg')) { memoire('sdis-recep-qui', ''); recMsg = null; rendre(); return; }
+  var pas = e.target.closest('[data-pas]');
+  if (pas) {
+    var l = null;
+    Object.keys(LIGNES).some(function (k) {
+      l = LIGNES[k].filter(function (x) { return x.id === pas.dataset.l; })[0]; return !!l;
+    });
+    if (!l) return;
+    var v = lireQte(l); if (isNaN(v)) v = l.rec;
+    v = Math.max(0, Math.min(l.liv, v + Number(pas.dataset.pas)));
+    SAISIE[l.id] = String(v); toucherRecep();
+    var inp = document.querySelector('[data-rec="' + l.id + '"]'); if (inp) inp.value = v;
+    return;
+  }
+  var en = e.target.closest('[data-enreg]');
+  if (en) { enregistrerReception(en.dataset.enreg, false); return; }
+  var to = e.target.closest('[data-tout]');
+  if (to) { enregistrerReception(to.dataset.tout, true); return; }
 });
 
 /* --- recherche : on redessine à chaque frappe, donc on rend le curseur ----
@@ -1654,6 +1942,10 @@ function focusRecherche() {
 }
 
 document.getElementById('ecran').addEventListener('input', function (e) {
+  if (e.target.dataset && e.target.dataset.rec) {
+    e.target.value = e.target.value.replace(/\D/g, '');
+    SAISIE[e.target.dataset.rec] = e.target.value; toucherRecep(); return;
+  }
   if (e.target.id !== 'q') return;
   q = e.target.value;
   rendre();            // rendre() repose le curseur, ici comme au rafraîchissement
