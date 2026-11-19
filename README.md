@@ -8,12 +8,10 @@ imprime le bon remis au client. Les bons sont saisis à la main au comptoir.
 Le détail du modèle de données, du mécanisme préparer / livrer et des
 décisions est dans [`docs/MEMO.md`](docs/MEMO.md).
 
-> **Dépôt privé — ne pas le rendre public.**
-> Les deux HTML contiennent l'URL Supabase, la clé publique et le code d'accès
-> client. Cette clé autorise encore l'écriture sur toutes les tables (voir
-> « État de la base » plus bas). Tant que les droits ne sont pas verrouillés
-> côté Supabase, ni ce dépôt ni l'adresse de l'espace client ne doivent être
-> communiqués.
+> **Dépôt public.** Les deux HTML contiennent l'URL Supabase, la clé publique
+> et le code d'accès client : ils sont lisibles par tous, comme les pages
+> elles-mêmes. Depuis `001_verrou_ecriture.sql`, cette clé ne permet que de
+> lire. Le dépôt ne doit être rendu public qu'**après** ce verrou.
 
 ---
 
@@ -37,16 +35,17 @@ fichier porte l'URL Supabase et la clé publique.
 | Morceau | Déploiement |
 |---|---|
 | Base de données | Supabase, projet `czdrfqhuamifuzznpqcq` (région eu) |
-| Outil du comptoir | Netlify — https://sdis33pro.netlify.app/ |
-| Espace client SDIS | Netlify — https://sdis33.netlify.app/ |
+| Outil du comptoir | GitHub Pages — https://jonathanbayol.github.io/SDIS33-interface/comptoir/ |
+| Espace client SDIS | GitHub Pages — https://jonathanbayol.github.io/SDIS33-interface/client/ |
 
-Les deux sites Netlify sont publiés par glisser-déposer (Deploys → Drag and
-drop), pas depuis ce dépôt. Chaque site reçoit un dossier contenant un seul
-`index.html`.
+Le dossier `site/` est publié automatiquement par
+`.github/workflows/pages.yml` à chaque modification fusionnée dans `main` :
+il n'y a plus rien à déposer à la main. **Source de vérité : la branche
+`main`.** Le dépôt est public (obligatoire pour GitHub Pages en gratuit) : n'y
+mettez jamais de mot de passe ni de clé secrète.
 
-**Source de vérité : ce qui tourne sur Netlify.** Les HTML de ce dépôt sont
-ceux des derniers déploiements au 2026-11-19. Pour resynchroniser : Deploys →
-dernier déploiement → Download, remplacer le fichier dans `site/`, commiter.
+Anciennes adresses Netlify (sdis33pro / sdis33.netlify.app) : remplacées par
+les pages de redirection de `netlify-redirections/`, puis à supprimer.
 
 ---
 
