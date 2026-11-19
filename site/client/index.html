@@ -605,7 +605,9 @@ function api(chemin, rejoue) {
     if (r.status === 401 && session && !rejoue) {
       return renouveler().then(function () { return api(chemin, true); });
     }
-    if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+    if (!r.ok) return r.text().then(function (t) {
+      var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e;
+    });
     return r.json();
   });
 }
@@ -699,6 +701,10 @@ function pourcent(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
 
 function humain(e) {
   var t = String(e && e.message || e);
+  if ((e && e.status >= 502 && e.status <= 504) || /PGRST00[23]|Gateway Time-?out/i.test(t)) {
+    return 'Le serveur ne r&eacute;pond pas pour le moment. R&eacute;essayez dans '
+         + 'quelques minutes ; si cela persiste, pr&eacute;venez BARRAULT Le Haillan.';
+  }
   if (/Failed to fetch|NetworkError/i.test(t)) {
     return 'Connexion au serveur impossible. V&eacute;rifiez votre acc&egrave;s '
          + 'r&eacute;seau, puis rechargez la page.';
@@ -728,7 +734,9 @@ function ouvrir() {
   document.getElementById('porte').hidden = true;
   document.getElementById('appli').hidden = false;
   charger(false);
-  setInterval(function () { charger(true); }, CONFIG.rafraichirSecondes * 1000);
+  // Onglet caché : pas de rechargement ; on rattrape au retour.
+  setInterval(function () { if (!document.hidden) charger(true); }, CONFIG.rafraichirSecondes * 1000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) charger(true); });
 }
 
 document.getElementById('cle').addEventListener('submit', function (e) {
