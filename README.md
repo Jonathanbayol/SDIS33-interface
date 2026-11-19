@@ -80,6 +80,11 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   (`using (true) with check (true)`) sur `bons`, `lignes` et `mouvements`, et
   `anon` a tous les droits sur les tables et les vues. C'est le verrou à poser
   avant de communiquer l'espace client.
+  → Corrigé par `supabase/001_verrou_ecriture.sql` (lecture seule pour
+  `anon`, écriture réservée au compte Supabase `comptoir@sdis33pro.netlify.app`,
+  connecté depuis la page comptoir). Retour arrière :
+  `001_verrou_ecriture_annuler.sql`. Report dans les sources du build :
+  `docs/connexion-comptoir-sources.md`.
 - **L'index `lignes(bon_id)` existe déjà** (`lignes_bon_id_idx`). La première
   piste du mémo contre les erreurs 504 est donc écartée ; reste la seconde,
   le rechargement complet toutes les 25 secondes.

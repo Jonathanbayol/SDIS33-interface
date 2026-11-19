@@ -910,6 +910,7 @@ body{
     <button class="btn nouv" id="recap" title="Imprimer le r&eacute;capitulatif de tous les articles en attente">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>R&eacute;cap RAL</button>
     <button class="btn ic" id="refresh" title="Rafraichir"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    <button class="btn" id="poste"></button>
     <button class="who" id="who"><span class="av anon">?</span><span id="whoTx">S'identifier</span></button>
   </div>
 </header>
@@ -950,6 +951,7 @@ var BANDEAU = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABPsAAADBCAMAAACOlEX
 var CONFIG = {
   url: 'https://czdrfqhuamifuzznpqcq.supabase.co',
   cle: 'sb_publishable_fYMPaqdsK8hVW6FUXxIzNA_mhH3LvbW',
+  compte: 'comptoir@sdis33pro.netlify.app',  // compte Supabase du comptoir (le mot de passe n'est PAS ici)
   verrouMinutes: 15,      // au-delà, on redemande le code opérateur
   rafraichirSecondes: 25  // les 5 postes voient les pointages des autres
 };
@@ -960,21 +962,143 @@ var CONFIG = {
 /* --------------------------------------------------------------------------
    Accès à la base
    -------------------------------------------------------------------------- */
-function api(chemin, opts) {
+function api(chemin, opts, rejoue) {
   opts = opts || {};
-  return fetch(CONFIG.url + '/rest/v1/' + chemin, {
-    method: opts.method || 'GET',
-    headers: {
-      'apikey': CONFIG.cle,
-      'Authorization': 'Bearer ' + CONFIG.cle,
-      'Content-Type': 'application/json',
-      'Prefer': opts.prefer || 'return=representation'
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined
+  return jeton().then(function (j) {
+    return fetch(CONFIG.url + '/rest/v1/' + chemin, {
+      method: opts.method || 'GET',
+      headers: {
+        'apikey': CONFIG.cle,
+        'Authorization': 'Bearer ' + j,
+        'Content-Type': 'application/json',
+        'Prefer': opts.prefer || 'return=representation'
+      },
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
   }).then(function (r) {
+    // Jeton expiré entre-temps : on le renouvelle et on rejoue une seule fois.
+    if (r.status === 401 && session && !rejoue) {
+      return renouveler().then(function () { return api(chemin, opts, true); });
+    }
     if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
     return r.status === 204 ? null : r.json();
   });
+}
+
+/* --------------------------------------------------------------------------
+   Connexion du poste
+
+   La base n'accepte les modifications que d'un poste connecté au compte
+   « comptoir » (CONFIG.compte). Sans connexion, elle ne laisse que lire,
+   comme pour l'espace client. Le mot de passe n'est écrit nulle part dans
+   cette page : on le tape une fois par poste, puis la session est gardée
+   dans le navigateur et renouvelée toute seule.
+   -------------------------------------------------------------------------- */
+var CLE_SESSION = 'sdis-comptoir-session';
+var session = lireSession(), renouvellement = null;
+
+function lireSession() {
+  try { return JSON.parse(localStorage.getItem(CLE_SESSION)) || null; } catch (e) { return null; }
+}
+function garderSession(s) {
+  session = s ? { access: s.access_token, refresh: s.refresh_token,
+                  expire: Date.now() + (s.expires_in || 3600) * 1000 } : null;
+  try {
+    if (session) localStorage.setItem(CLE_SESSION, JSON.stringify(session));
+    else localStorage.removeItem(CLE_SESSION);
+  } catch (e) { /* stockage bloqué : la session ne durera que le temps de l'onglet */ }
+  majPoste();
+}
+function auth(chemin, corps) {
+  return fetch(CONFIG.url + '/auth/v1/' + chemin, {
+    method: 'POST',
+    headers: { 'apikey': CONFIG.cle, 'Content-Type': 'application/json' },
+    body: JSON.stringify(corps)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (r.ok) return j;
+      var e = new Error(j.error_description || j.msg || j.message || ('HTTP ' + r.status));
+      e.status = r.status; throw e;
+    });
+  });
+}
+function renouveler() {
+  if (!renouvellement) {
+    renouvellement = auth('token?grant_type=refresh_token', { refresh_token: session.refresh })
+      .then(garderSession, function (e) {
+        // Session refusée (mot de passe changé, compte désactivé) : il faudra se
+        // reconnecter. Réseau coupé : on garde la session et on réessaiera.
+        if (e.status >= 400 && e.status < 500) garderSession(null);
+        throw e;
+      })
+      .then(function () { renouvellement = null; },
+            function (e) { renouvellement = null; throw e; });
+  }
+  return renouvellement;
+}
+// Jeton présenté à la base : celui du poste connecté, sinon la clé publique.
+function jeton() {
+  if (!session) return Promise.resolve(CONFIG.cle);
+  if (Date.now() < session.expire - 60000) return Promise.resolve(session.access);
+  var suite = function () { return session ? session.access : CONFIG.cle; };
+  return renouveler().then(suite, suite);
+}
+function majPoste() {
+  var b = document.getElementById('poste');
+  if (!b) return;
+  b.textContent = session ? 'Poste connect\u00e9' : 'Connecter ce poste';
+  b.classList.toggle('pri', !session);
+  b.title = session ? 'Ce poste peut modifier la base. Cliquer pour le d\u00e9connecter.'
+                    : 'Sans connexion, ce poste peut seulement consulter.';
+}
+function demanderConnexion() {
+  if (document.getElementById('ov')) return;
+  var ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'ov';
+  ov.innerHTML = '<form class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">'
+    + '<h3 id="shT">Connecter ce poste</h3>'
+    + '<p>Mot de passe du compte comptoir. &Agrave; faire une seule fois par poste.</p>'
+    + '<input class="code" id="mdp" type="password" autocomplete="current-password" '
+    + 'style="font-size:20px;letter-spacing:.08em;text-indent:0" aria-label="Mot de passe">'
+    + '<p class="err" id="er"></p>'
+    + '<div class="row"><button type="button" class="btn" id="cancel">Plus tard</button>'
+    + '<button type="submit" class="btn pri" id="ok">Se connecter</button></div></form>';
+  document.body.appendChild(ov);
+  var mdp = document.getElementById('mdp'); mdp.focus();
+  ov.querySelector('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!mdp.value) return;
+    var ok = document.getElementById('ok'); ok.disabled = true;
+    auth('token?grant_type=password', { email: CONFIG.compte, password: mdp.value })
+      .then(function (s) { garderSession(s); fermer(); erreur = null; charger(true); })
+      .catch(function (e) {
+        ok.disabled = false;
+        document.getElementById('er').textContent = e.status === 400
+          ? 'Mot de passe refus\u00e9.' : humain(e);
+        mdp.classList.add('bad'); mdp.select();
+        setTimeout(function () { mdp.classList.remove('bad'); }, 430);
+      });
+  });
+  document.getElementById('cancel').addEventListener('click', fermer);
+  document.addEventListener('keydown', echap);
+}
+function demanderDeconnexion() {
+  if (document.getElementById('ov')) return;
+  var ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'ov';
+  ov.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">'
+    + '<h3 id="shT">D&eacute;connecter ce poste&nbsp;?</h3>'
+    + '<p>Il ne pourra plus que consulter, jusqu&rsquo;&agrave; ce qu&rsquo;on retape le mot de passe.</p>'
+    + '<div class="row"><button class="btn" id="cancel">Annuler</button>'
+    + '<button class="btn pri" id="ok">D&eacute;connecter</button></div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('ok').addEventListener('click', function () {
+    var a = session && session.access;
+    garderSession(null); fermer();
+    if (a) fetch(CONFIG.url + '/auth/v1/logout', { method: 'POST',
+      headers: { 'apikey': CONFIG.cle, 'Authorization': 'Bearer ' + a } }).catch(function () {});
+  });
+  document.getElementById('cancel').addEventListener('click', fermer);
+  ov.addEventListener('click', function (e) { if (e.target === ov) fermer(); });
+  document.addEventListener('keydown', echap);
 }
 
 var DATA = [], CODES = {}, sel = null, chargement = true, erreur = null;
@@ -1093,7 +1217,9 @@ function charger(silencieux) {
   return Promise.all([
     api('v_bons?select=*&order=date_bon.desc'),
     api('v_lignes?select=*&order=ordre.asc'),
-    Object.keys(CODES).length ? Promise.resolve(null) : api('operateurs?select=code,nom&actif=is.true')
+    // La liste des opérateurs n'est lisible que par un poste connecté.
+    (!session || Object.keys(CODES).length) ? Promise.resolve(null)
+      : api('operateurs?select=code,nom&actif=is.true')
   ]).then(function (r) {
     var bons = r[0], lignes = r[1];
     if (r[2]) r[2].forEach(function (o) { CODES[o.code] = o.nom; });
@@ -1155,6 +1281,12 @@ function humain(e) {
   if (/Failed to fetch|NetworkError|Load failed/i.test(m))
     return 'Base injoignable. Vérifie ta connexion internet ; '
          + 'si elle fonctionne, le projet Supabase est peut-être en veille.';
+  if (/42501|permission denied|row-level security/i.test(m)) {
+    if (!session) { setTimeout(demanderConnexion, 0);
+      return 'Ce poste n\'est pas connect\u00e9 : il peut consulter mais pas modifier. '
+           + 'Clique sur \u00ab Connecter ce poste \u00bb.'; }
+    return 'La base refuse la modification pour ce compte.';
+  }
   if (/JWT|apikey|Invalid API key|401|403/i.test(m))
     return 'Clé d\'accès refusée par la base. Vérifie la clé dans la configuration de la page.';
   if (/relation .* does not exist|42P01/i.test(m))
@@ -1255,6 +1387,7 @@ function fermer() {
   enAttente = null; document.removeEventListener('keydown', echap);
 }
 function agir(fn) {
+  if (!session) { demanderConnexion(); return; }   // sans connexion, la base refuserait
   if (!moi || Date.now() - derniereAction > CONFIG.verrouMinutes * 60000) { demander(fn); return; }
   derniereAction = Date.now(); fn();
 }
@@ -2848,7 +2981,12 @@ rendre = function () { _rendre(); majFiltreOperateurs(); };
 })();
 
 majQui();
+majPoste();
+document.getElementById('poste').addEventListener('click', function () {
+  if (session) demanderDeconnexion(); else demanderConnexion();
+});
 charger(false);
+if (!session) demanderConnexion();
 })();
 </script>
 </body>
