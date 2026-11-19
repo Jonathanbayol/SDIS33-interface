@@ -980,7 +980,9 @@ function api(chemin, opts, rejoue) {
     if (r.status === 401 && session && !rejoue) {
       return renouveler().then(function () { return api(chemin, opts, true); });
     }
-    if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+    if (!r.ok) return r.text().then(function (t) {
+      var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e;
+    });
     return r.status === 204 ? null : r.json();
   });
 }
@@ -1128,7 +1130,8 @@ function prepaL(l) { return Math.max(0, l.exp - l.liv); }       // prêt, pas pa
 function ralD(d) { return d.lignes.reduce(function (s, l) { return s + ralL(l); }, 0); }
 function prepaD(d) { return d.lignes.reduce(function (s, l) { return s + prepaL(l); }, 0); }
 function livD(d) { return d.lignes.reduce(function (s, l) { return s + l.liv; }, 0); }
-function solde(d) { return ralD(d) === 0; }
+// Un bon sans aucune ligne n'est pas soldé : il reste à compléter.
+function solde(d) { return d.lignes.length > 0 && ralD(d) === 0; }
 function nivAge(a) { return a < VERT ? 'g' : (a <= ORANGE ? 'o' : 'r'); }
 
 /* L'état d'une ligne. La préparation passe devant : c'est l'action en cours,
@@ -1278,6 +1281,11 @@ function charger(silencieux) {
 /* Un message d'erreur doit dire quoi faire, pas seulement que ça a raté. */
 function humain(e) {
   var m = (e && e.message) || String(e);
+  // La base (ou le service devant elle) ne répond plus : c'est la panne du
+  // 15-16 novembre. Le remède connu est de redémarrer le projet Supabase.
+  if ((e && e.status >= 502 && e.status <= 504) || /PGRST00[23]|Gateway Time-?out/i.test(m))
+    return 'La base ne r\u00e9pond pas pour le moment. Si \u00e7a dure plus de 5 minutes : '
+         + 'Supabase \u2192 Settings \u2192 General \u2192 Restart project.';
   if (/Failed to fetch|NetworkError|Load failed/i.test(m))
     return 'Base injoignable. Vérifie ta connexion internet ; '
          + 'si elle fonctionne, le projet Supabase est peut-être en veille.';
@@ -2956,9 +2964,14 @@ function saisieEnCours() {
   var a = document.activeElement;
   return !!(a && (a.tagName === 'INPUT' || a.tagName === 'SELECT'));
 }
-setInterval(function () { if (!saisieEnCours()) charger(true); },
+// Page cachée ou poste en veille : on ne recharge pas pour rien. Le
+// rechargement reprend dès que la page revient au premier plan.
+setInterval(function () { if (!document.hidden && !saisieEnCours()) charger(true); },
             CONFIG.rafraichirSecondes * 1000);
 window.addEventListener('focus', function () { if (!saisieEnCours()) charger(true); });
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && !saisieEnCours()) charger(true);
+});
 
 /* Liste des opérateurs dans le filtre, une fois les données chargées */
 function majFiltreOperateurs() {
