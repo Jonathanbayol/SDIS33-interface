@@ -8,10 +8,10 @@ imprime le bon remis au client. Les bons sont saisis à la main au comptoir.
 Le détail du modèle de données, du mécanisme préparer / livrer et des
 décisions est dans [`docs/MEMO.md`](docs/MEMO.md).
 
-> **Dépôt public.** Les deux HTML contiennent l'URL Supabase, la clé publique
-> et le code d'accès client : ils sont lisibles par tous, comme les pages
-> elles-mêmes. Depuis `001_verrou_ecriture.sql`, cette clé ne permet que de
-> lire. Le dépôt ne doit être rendu public qu'**après** ce verrou.
+> **Dépôt public.** Les deux HTML contiennent l'URL Supabase et la clé
+> publique, lisibles par tous. Seule, cette clé ne donne accès à rien
+> (`001` et `002`) : il faut le mot de passe d'un des deux comptes Supabase,
+> qui n'est jamais écrit dans le dépôt.
 
 ---
 
@@ -84,6 +84,11 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   connecté depuis la page comptoir). Retour arrière :
   `001_verrou_ecriture_annuler.sql`. Report dans les sources du build :
   `docs/connexion-comptoir-sources.md`.
+- **Lecture fermée sans connexion** (`supabase/002_lecture_client.sql`) :
+  l'espace client se connecte au compte Supabase `barrault-interface@sdis33.fr`
+  (mot de passe donné au SDIS, remplace le code 30258). Sans connexion, la
+  base ne renvoie plus rien. Retour arrière : `002_lecture_client_annuler.sql`.
+  Report dans les sources : `docs/connexion-client-sources.md`.
 - **L'index `lignes(bon_id)` existe déjà** (`lignes_bon_id_idx`). La première
   piste du mémo contre les erreurs 504 est donc écartée ; reste la seconde,
   le rechargement complet toutes les 25 secondes.

@@ -1049,7 +1049,7 @@ function majPoste() {
   b.textContent = session ? 'Poste connect\u00e9' : 'Connecter ce poste';
   b.classList.toggle('pri', !session);
   b.title = session ? 'Ce poste peut modifier la base. Cliquer pour le d\u00e9connecter.'
-                    : 'Sans connexion, ce poste peut seulement consulter.';
+                    : 'Sans connexion, la base refuse l\u2019acc\u00e8s \u00e0 ce poste.';
 }
 function demanderConnexion() {
   if (document.getElementById('ov')) return;
@@ -1086,7 +1086,7 @@ function demanderDeconnexion() {
   var ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'ov';
   ov.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">'
     + '<h3 id="shT">D&eacute;connecter ce poste&nbsp;?</h3>'
-    + '<p>Il ne pourra plus que consulter, jusqu&rsquo;&agrave; ce qu&rsquo;on retape le mot de passe.</p>'
+    + '<p>Il n&rsquo;aura plus acc&egrave;s aux bons jusqu&rsquo;&agrave; ce qu&rsquo;on retape le mot de passe.</p>'
     + '<div class="row"><button class="btn" id="cancel">Annuler</button>'
     + '<button class="btn pri" id="ok">D&eacute;connecter</button></div></div>';
   document.body.appendChild(ov);
@@ -1283,7 +1283,7 @@ function humain(e) {
          + 'si elle fonctionne, le projet Supabase est peut-être en veille.';
   if (/42501|permission denied|row-level security/i.test(m)) {
     if (!session) { setTimeout(demanderConnexion, 0);
-      return 'Ce poste n\'est pas connect\u00e9 : il peut consulter mais pas modifier. '
+      return 'Ce poste n\'est pas connect\u00e9 : la base refuse l\'acc\u00e8s. '
            + 'Clique sur \u00ab Connecter ce poste \u00bb.'; }
     return 'La base refuse la modification pour ce compte.';
   }

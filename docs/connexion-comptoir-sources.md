@@ -277,3 +277,11 @@ function agir(fn) {
   if (!session) { demanderConnexion(); return; }   // sans connexion, la base refuserait
   if (!moi
 ```
+
+## 8. Messages ajustés pour la migration 002 (lecture fermée sans connexion)
+
+Dans la fonction `humain()` : remplacer `il peut consulter mais pas modifier. ` par `la base refuse l\'accès. `.
+
+Dans `majPoste()` : remplacer `'Sans connexion, ce poste peut seulement consulter.'` par `'Sans connexion, la base refuse l’accès à ce poste.'`.
+
+Dans `demanderDeconnexion()` : remplacer `Il ne pourra plus que consulter, jusqu&rsquo;&agrave; ce qu&rsquo;on retape le mot de passe.` par `Il n&rsquo;aura plus acc&egrave;s aux bons jusqu&rsquo;&agrave; ce qu&rsquo;on retape le mot de passe.`
