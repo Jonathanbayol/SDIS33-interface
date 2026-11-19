@@ -7,14 +7,14 @@
 --
 --  Après :
 --    - sans connexion : plus rien, ni lecture ni écriture.
---    - compte client « sdis@sdis33pro.netlify.app » (espace client) : lecture
+--    - compte client « barrault-interface@sdis33.fr » (espace client) : lecture
 --      des bons, lignes et mouvements.
 --    - compte « comptoir@sdis33pro.netlify.app » : lecture et écriture, comme
 --      avec 001, plus la liste des opérateurs.
 --    - tout autre compte connecté : rien.
 --
 --  Prérequis AVANT de jouer ce script :
---    1. le compte sdis@sdis33pro.netlify.app existe (Authentication → Users)
+--    1. le compte barrault-interface@sdis33.fr existe (Authentication → Users)
 --    2. la nouvelle page client (avec mot de passe) est en ligne
 --    3. les postes du comptoir sont connectés (sinon ils ne voient plus rien)
 --
@@ -29,7 +29,7 @@ create or replace function public.est_sdis()
   stable
   set search_path = ''
 as $$
-  select coalesce((select auth.jwt() ->> 'email') = 'sdis@sdis33pro.netlify.app', false)
+  select coalesce((select auth.jwt() ->> 'email') = 'barrault-interface@sdis33.fr', false)
 $$;
 revoke execute on function public.est_sdis() from public, anon;
 grant execute on function public.est_sdis() to authenticated;

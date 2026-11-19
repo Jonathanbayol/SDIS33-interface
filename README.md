@@ -85,7 +85,7 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   `001_verrou_ecriture_annuler.sql`. Report dans les sources du build :
   `docs/connexion-comptoir-sources.md`.
 - **Lecture fermée sans connexion** (`supabase/002_lecture_client.sql`) :
-  l'espace client se connecte au compte Supabase `sdis@sdis33pro.netlify.app`
+  l'espace client se connecte au compte Supabase `barrault-interface@sdis33.fr`
   (mot de passe donné au SDIS, remplace le code 30258). Sans connexion, la
   base ne renvoie plus rien. Retour arrière : `002_lecture_client_annuler.sql`.
   Report dans les sources : `docs/connexion-client-sources.md`.

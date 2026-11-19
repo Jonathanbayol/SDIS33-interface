@@ -13,7 +13,7 @@ Avant :
 Après :
 
 ```js
-  compte: 'sdis@sdis33pro.netlify.app',  // compte Supabase du client (le mot de passe n'est PAS ici)
+  compte: 'barrault-interface@sdis33.fr',  // compte Supabase du client (le mot de passe n'est PAS ici)
 ```
 
 ## 2. Commentaire d'en-tête
