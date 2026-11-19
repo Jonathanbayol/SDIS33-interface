@@ -82,20 +82,20 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
   → Corrigé par `supabase/001_verrou_ecriture.sql` (lecture seule pour
   `anon`, écriture réservée au compte Supabase `comptoir@sdis33pro.netlify.app`,
   connecté depuis la page comptoir). Retour arrière :
-  `001_verrou_ecriture_annuler.sql`. Report dans les sources du build :
-  `docs/connexion-comptoir-sources.md`.
+  `001_verrou_ecriture_annuler.sql`.
 - **Lecture fermée sans connexion** (`supabase/002_lecture_client.sql`) :
   l'espace client se connecte au compte Supabase `barrault-interface@sdis33.fr`
   (mot de passe donné au SDIS, remplace le code 30258). Sans connexion, la
   base ne renvoie plus rien. Retour arrière : `002_lecture_client_annuler.sql`.
-  Report dans les sources : `docs/connexion-client-sources.md`.
 - **L'index `lignes(bon_id)` existe déjà** (`lignes_bon_id_idx`). La première
-  piste du mémo contre les erreurs 504 est donc écartée ; reste la seconde,
-  le rechargement complet toutes les 25 secondes.
+  piste du mémo contre les erreurs 504 est donc écartée. Diagnostic du
+  2026-11-19 : une seule panne (15-16 nov.), pool de connexions PostgREST
+  bloqué, réglée par un redémarrage ; les requêtes sont rapides. Si ça
+  revient : Supabase → Settings → General → Restart project.
 - **Bon vide affiché « Livré » :** confirmé dans `v_bons`, le statut passe à
   `livre` quand la somme des RAL vaut 0, y compris sans aucune ligne.
   → Corrigé par `supabase/003_bon_vide.sql` (vue) et dans `solde()` de la
-  page comptoir (à reporter dans `app.js`) : un bon sans ligne suit la règle
+  page comptoir : un bon sans ligne suit la règle
   des bons en attente (attente / surveiller / retard).
 - `trace_entete()` est `security definer` sans `search_path` fixé, à la
   différence de `trace_mouvement()`.
@@ -104,9 +104,7 @@ Toute nouvelle migration s'ajoute à côté, numérotée à la suite
 
 ## Hors dépôt
 
-- **Sources du build des pages.** Les HTML sont assemblés par `build.py` et
-  `build-client.py` à partir de sources séparées (`app.js`, `client.js`,
-  `client-head.html`, catalogue), restées sur le PC de Joe. Une modification
-  faite directement dans `site/*/index.html` sera écrasée au prochain build si
-  la source n'est pas modifiée aussi.
+- **Plus de sources hors dépôt.** Depuis le 2026-11-19, `site/comptoir/index.html`
+  et `site/client/index.html` sont la seule version des pages : on les modifie
+  directement ici. Les anciens `build.py` / `app.js` ne sont plus utilisés.
 - **Lecteur de scans : abandonné.** Les bons sont désormais saisis à la main.
