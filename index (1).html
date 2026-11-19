@@ -1,0 +1,2855 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script>/* avant le premier pixel : sinon l'écran clignote au chargement */
+try{var t=localStorage.getItem('sdis-theme');
+if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+<title>SDIS 33 — Suivi RAL</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E">
+<style>
+/* ===========================================================================
+   Palette — camaïeu de bleu sur anthracite
+
+   Parti pris assumé : cette interface est sombre, point. Elle tourne sur cinq
+   postes fixes au comptoir, souvent en lumière artificielle, du matin au soir.
+   Un fond sombre fatigue moins l'œil dans ces conditions, et fait ressortir
+   les trois seules couleurs qui portent de l'information : vert, orange, rouge.
+
+   Tous les contrastes ci-dessous ont été calculés, pas estimés :
+     texte principal / carte ....... 16,6:1
+     texte secondaire / carte ....... 7,7:1
+     texte tertiaire / carte ........ 4,3:1   (élément, pas du texte courant)
+     blanc / bleu plein ............. 4,8:1
+     blanc / vert, orange, rouge .... 5,4 / 4,7 / 5,6:1
+   L'Electric Blue #0066FF ne passe qu'en APLAT — en texte sur fond sombre il
+   tombe à 3,9:1. D'où deux variables distinctes : --acc pour le fond plein,
+   --acc-hi pour le texte d'accent.
+   =========================================================================== */
+:root{
+  /* surfaces, du plus profond au plus proche */
+  --bg:#05070F;            /* fond de page */
+  --card:#0A1024;          /* Orbit Navy — les cartes */
+  --card2:#121A33;         /* surface soulevée, survol de ligne */
+  --fill:#18223F;          /* fond des contrôles */
+
+  /* texte */
+  --tx:#EAF0FF; --tx2:#97A6C8; --tx3:#69789A;
+
+  /* séparateurs */
+  --sep:rgba(150,180,255,.16); --sep2:rgba(150,180,255,.08);
+
+  /* accent — camaïeu de bleu */
+  --acc:#0066FF;                        /* Electric Blue, aplats uniquement */
+  --acc-hi:#5AA0FF;                     /* texte et icônes d'accent */
+  --acc-lo:#0A2A63;                     /* surfaces teintées profondes */
+  --acc-halo:rgba(0,102,255,.24);
+  --blue:var(--acc-hi); --blue-f:var(--acc); --blue-s:var(--acc-halo);
+
+  /* états — trois, jamais plus */
+  --green:#3FD39A; --green-f:#0F7A52; --green-s:rgba(63,211,154,.14);
+  --orange:#F0A93B; --orange-f:#A96410; --orange-s:rgba(240,169,59,.14);
+  --red:#FF7A70;   --red-f:#C0342C;    --red-s:rgba(255,122,112,.14);
+
+  /* élévation : sur fond sombre l'ombre seule ne suffit pas, on ajoute un
+     liseré clair en haut de chaque surface, comme un reflet */
+  --sh-s:0 1px 2px rgba(0,0,0,.55);
+  --sh-m:0 2px 6px rgba(0,0,0,.5),0 12px 32px rgba(0,0,0,.45);
+  --sh-l:0 24px 64px rgba(0,0,0,.75),0 4px 12px rgba(0,0,0,.6);
+  --sh-acc:0 6px 20px rgba(0,102,255,.35);
+  --reflet:inset 0 1px 0 rgba(160,195,255,.09);
+
+  /* verre */
+  --glass:rgba(10,16,36,.62);
+  --glass-bord:rgba(150,180,255,.14);
+  --voile:rgba(3,5,12,.55);
+  --verre-haut:rgba(24,34,63,.92); --verre-bas:rgba(10,16,36,.96);
+
+  /* rayons */
+  --r-s:9px; --r-m:14px; --r-l:20px;
+
+  /* mouvement : trois durées, deux courbes, rien d'autre */
+  --t-clic:140ms;
+  --t-etat:220ms;
+  --t-bloc:340ms;
+  --e-sortie:cubic-bezier(.22,1,.36,1);
+  --e-bloc:cubic-bezier(.4,0,.2,1);
+
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+/* sans ceci, display:flex des pastilles l'emporte sur l'attribut hidden */
+[hidden]{display:none !important}
+body{margin:0;background:var(--bg);color:var(--tx);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue","Inter",Helvetica,Arial,sans-serif;
+  font-size:14px;line-height:1.47;letter-spacing:-.008em;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.num{font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none;letter-spacing:inherit}
+:focus-visible{outline:3px solid var(--blue-s);outline-offset:1px;border-radius:6px}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+/* ============ bandeau ============ */
+.top{position:sticky;top:0;z-index:30;background:var(--glass);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-bottom:.5px solid var(--sep)}
+.topin{max-width:1360px;margin:0 auto;padding:12px 24px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;min-width:132px}
+.brand b{font-size:19px;font-weight:600;letter-spacing:-.022em;line-height:1.2}
+.brand span{font-size:11.5px;color:var(--tx3);letter-spacing:-.003em}
+.srch{flex:1;min-width:230px;position:relative}
+.srch input{width:100%;padding:9px 14px 9px 36px;border:none;border-radius:99px;background:var(--fill);
+  color:var(--tx);font:inherit;font-size:14px;transition:box-shadow .2s}
+.srch input::placeholder{color:var(--tx3)}
+.srch input:focus{outline:none;box-shadow:0 0 0 4px var(--blue-s)}
+.srch svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--tx3)}
+.pills{display:flex;gap:8px}
+.pill{border-radius:var(--r-m);padding:7px 15px;background:var(--card);box-shadow:var(--sh-s);
+  display:flex;flex-direction:column;align-items:flex-start;gap:0;min-width:76px;transition:transform .18s,box-shadow .18s}
+.pill:hover{transform:translateY(-1px);box-shadow:var(--sh-m)}
+.pill[aria-pressed="true"]{background:var(--tx);color:var(--bg)}
+.pill[aria-pressed="true"] span{color:var(--bg);opacity:.7}
+.pill[aria-pressed="true"] b{color:var(--bg) !important}
+.pill b{font-size:21px;font-weight:600;letter-spacing:-.02em;line-height:1.15;font-variant-numeric:tabular-nums}
+.pill span{font-size:10.5px;color:var(--tx2);white-space:nowrap;letter-spacing:0}
+.p-red b{color:var(--red)} .p-org b{color:var(--orange)}
+
+.who{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 6px;border-radius:99px;
+  background:var(--card);box-shadow:var(--sh-s);font-size:13px;font-weight:500;transition:box-shadow .18s}
+.who:hover{box-shadow:var(--sh-m)}
+.who .av{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;color:#fff;
+  font-size:10.5px;font-weight:600;letter-spacing:.2px}
+.who .av.anon{background:var(--tx3)}
+
+.note{max-width:1360px;margin:0 auto;padding:12px 24px 0;font-size:12.5px;color:var(--tx2)}
+.note b{color:var(--tx);font-weight:600}
+
+/* ============ grille ============ */
+.wrap{max-width:1360px;margin:0 auto;padding:14px 24px 56px;display:grid;
+  grid-template-columns:minmax(272px,340px) 1fr;gap:18px;align-items:start}
+@media(max-width:920px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:var(--r-l);box-shadow:var(--sh-m);overflow:hidden}
+
+/* ============ liste ============ */
+.ctrl{padding:13px 14px 12px;display:flex;flex-direction:column;gap:10px;border-bottom:.5px solid var(--sep2)}
+.seg{display:flex;background:var(--fill);border-radius:9px;padding:2px;gap:2px}
+.seg button{flex:1;padding:5px 4px;border-radius:7px;font-size:12.5px;font-weight:500;color:var(--tx2);
+  transition:background .2s,color .2s,box-shadow .2s;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--tx);font-weight:600;box-shadow:var(--sh-s)}
+/* ---- choix BL / CMD dans la saisie manuelle -----------------------------
+   Ce n'est pas un filtre comme .seg, c'est une declaration : l'operateur dit
+   ce qu'il a sous les yeux, et rien d'autre ne le dira a sa place. L'etat
+   choisi prend donc un aplat plein et du texte blanc — on doit le lire d'un
+   coup d'oeil depuis l'autre bout du comptoir, pas le deviner. */
+.seg2{display:flex;background:var(--fill);border-radius:9px;padding:2px;gap:2px}
+.seg2 button{
+  flex:1;padding:6px 4px;border-radius:7px;
+  font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--tx3);
+  transition:background var(--t-clic) ease,color var(--t-clic) ease,
+             box-shadow var(--t-clic) ease,transform var(--t-clic) ease;
+}
+.seg2 button:hover{color:var(--tx2);background:var(--card2)}
+.seg2 button:active{transform:scale(.97)}
+.seg2 button[aria-pressed="true"]{
+  background:var(--acc);color:#fff;box-shadow:var(--sh-s);
+}
+/* Au survol on n'eclaircit PAS le fond : --acc-hi est une couleur de TEXTE,
+   du blanc dessus tomberait a 2,7:1. On souleve, le bleu ne bouge pas —
+   blanc sur --acc reste a 4,8:1 dans les deux themes. */
+.seg2 button[aria-pressed="true"]:hover{
+  background:var(--acc);color:#fff;box-shadow:0 6px 18px rgba(0,102,255,.42);
+}
+
+select{width:100%;font:inherit;font-size:12.5px;padding:7px 10px;border:none;border-radius:9px;
+  background:var(--fill);color:var(--tx2);appearance:none;cursor:pointer}
+select:focus{outline:none;box-shadow:0 0 0 4px var(--blue-s)}
+.lwrap{max-height:min(66vh,760px);overflow-y:auto;padding:6px}
+.grp{padding:12px 10px 5px;font-size:11px;font-weight:600;color:var(--tx3);
+  text-transform:uppercase;letter-spacing:.05em}
+.disc{width:100%;display:flex;align-items:center;gap:7px;padding:9px 10px;margin-top:4px;
+  border-radius:10px;font-size:12.5px;font-weight:500;color:var(--tx2);transition:background .18s}
+.disc:hover{background:var(--fill)}
+.disc svg{transition:transform .28s cubic-bezier(.4,0,.2,1);color:var(--tx3)}
+.disc[aria-expanded="true"] svg{transform:rotate(90deg)}
+.disc .n{margin-left:auto;font-size:11.5px;color:var(--tx3);font-variant-numeric:tabular-nums}
+
+.item{width:100%;text-align:left;padding:10px 11px;border-radius:11px;display:flex;flex-direction:column;gap:5px;
+  transition:background .16s}
+.item:hover{background:var(--fill)}
+.item[aria-current="true"]{background:var(--blue-s)}
+.r1{display:flex;align-items:baseline;gap:9px;justify-content:space-between}
+/* La nature du document — BL facturé, CMD pas encore. Pour le suivi des
+   restes à livrer les deux disent la même chose, donc l'étiquette reste
+   sourde : elle nomme, elle n'alerte pas. Les badges de couleur de la ligne
+   sont réservés à l'état, qui lui appelle un geste. */
+.nat{
+  flex:none;margin-right:-4px;padding:1.5px 6px;border-radius:5px;
+  background:var(--fill);color:var(--tx3);
+  font-size:9.5px;font-weight:700;letter-spacing:.06em;
+}
+.item[aria-current="true"] .nat{color:var(--tx2)}
+.bn{flex:1 1 auto;font-size:14.5px;font-weight:600;letter-spacing:-.015em;
+  font-variant-numeric:tabular-nums}
+.vr{font-size:11.5px;color:var(--tx2);font-variant-numeric:tabular-nums}
+.r2{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--tx2)}
+.bar{flex:1;height:3px;border-radius:2px;background:var(--sep);overflow:hidden;min-width:26px}
+.bar i{display:block;height:100%;border-radius:2px;background:var(--green);transition:width .45s cubic-bezier(.4,0,.2,1)}
+.av{display:inline-grid;place-items:center;border-radius:50%;color:#fff !important;
+  font-weight:700;flex:none;line-height:1}
+.av.sm{width:20px;height:20px;font-size:9px;letter-spacing:.2px}
+
+/* ---- scrollbars discrètes ---- */
+*{scrollbar-width:thin;scrollbar-color:transparent transparent}
+*:hover{scrollbar-color:var(--sep) transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:transparent;border-radius:99px;border:2px solid transparent;
+  background-clip:content-box;transition:background-color .2s}
+:hover::-webkit-scrollbar-thumb{background:var(--sep);background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--tx3);background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
+
+/* ============ badges : fond plein, texte blanc ============ */
+.bdg{display:inline-block;font-size:11px;font-weight:600;padding:2.5px 9px;border-radius:99px;
+  white-space:nowrap;letter-spacing:0;color:#fff !important;line-height:1.45}
+.g{background:var(--green-f)}
+.o{background:var(--orange-f)}
+.r{background:var(--red-f)}
+.b{background:var(--blue-f)}
+
+/* ============ détail ============ */
+.dh{padding:22px 24px 18px;display:flex;gap:20px 30px;align-items:flex-start;flex-wrap:wrap;
+  border-bottom:.5px solid var(--sep2)}
+.meta{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start;flex:1 1 auto;min-width:0}
+.n0{background:var(--tx3);color:#fff}
+.kv{display:flex;flex-direction:column;gap:3px}
+.kv span{font-size:11px;color:var(--tx3);letter-spacing:-.002em}
+.kv b{font-size:15px;font-weight:600;letter-spacing:-.012em;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;gap:6px}
+.kv.big b{font-size:27px;letter-spacing:-.028em;line-height:1.1}
+.kv.acc b{color:var(--blue)}
+.acts{margin-left:auto;display:flex;gap:9px;align-items:center}
+.btn{padding:8px 17px;border-radius:99px;background:var(--fill);font-size:13.5px;font-weight:500;
+  transition:transform .16s,filter .16s,opacity .16s}
+.btn:hover:not(:disabled){transform:scale(1.03)}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.pri{background:var(--blue);color:#fff;font-weight:600}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-size:11px;font-weight:600;color:var(--tx3);text-align:left;padding:10px 14px;
+  border-bottom:.5px solid var(--sep);white-space:nowrap;letter-spacing:-.002em;
+  text-transform:uppercase;letter-spacing:.04em}
+td{padding:11px 14px;border-bottom:.5px solid var(--sep2);vertical-align:middle}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr{transition:background .2s}
+tr.done td{color:var(--tx2)}
+tr.flash td{background:var(--blue-s)}
+.ref{font-weight:600;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:-.004em}
+.ref em{font-style:normal;color:var(--tx3);font-weight:400;margin:0 1px}
+.des{color:var(--tx2);font-size:12.5px}
+.trace{display:block;font-size:11px;color:var(--tx3);margin-top:2px}
+.step{display:inline-flex;align-items:center;background:var(--fill);border-radius:99px;padding:2px}
+.step button{width:26px;height:26px;border-radius:50%;font-size:16px;line-height:1;color:var(--tx2);
+  display:grid;place-items:center;transition:background .16s,color .16s,transform .16s}
+.step button:hover:not(:disabled){background:var(--card);color:var(--blue);box-shadow:var(--sh-s)}
+.step button:active:not(:disabled){transform:scale(.9)}
+.step button:disabled{opacity:.28;cursor:not-allowed}
+.step .v{min-width:32px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums;font-size:13.5px}
+/* correction discrète de la quantité due : rien ne bouge tant qu'on ne survole pas */
+.du{font:inherit;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:7px;
+  color:inherit;transition:background .15s,box-shadow .15s}
+tr:hover .du{background:var(--fill)}
+.du:hover{box-shadow:inset 0 0 0 1px var(--sep)}
+.du.corr{font-weight:600;box-shadow:inset 0 0 0 1px var(--blue-f)}
+.duin{width:56px;font:inherit;font-weight:600;text-align:right;padding:2px 7px;border:none;
+  border-radius:7px;background:var(--fill);color:var(--tx);font-variant-numeric:tabular-nums;
+  box-shadow:0 0 0 3px var(--blue-s)}
+.duin:focus{outline:none}
+.ral{font-weight:600;font-variant-numeric:tabular-nums}
+.ral.z{color:var(--tx3);font-weight:400}
+.foot{padding:14px 24px;display:flex;gap:16px;flex-wrap:wrap;align-items:center;
+  font-size:12.5px;color:var(--tx2);border-top:.5px solid var(--sep2)}
+.empty{padding:72px 24px;text-align:center;color:var(--tx3);font-size:13.5px}
+
+/* ============ modale ============ */
+.ov{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;
+  background:rgba(0,0,0,.28);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:fade .22s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes pop{from{opacity:0;transform:scale(.94) translateY(8px)}to{opacity:1;transform:none}}
+.sheet{background:var(--card);border-radius:22px;box-shadow:var(--sh-l);width:min(400px,100%);
+  padding:28px 26px 22px;text-align:center;animation:pop .28s cubic-bezier(.22,1,.36,1)}
+.sheet h3{margin:0 0 5px;font-size:19px;font-weight:600;letter-spacing:-.02em}
+.sheet p{margin:0 0 20px;font-size:13.5px;color:var(--tx2)}
+.code{width:100%;text-align:center;font-size:34px;font-weight:600;letter-spacing:.32em;text-indent:.32em;
+  padding:14px 0;border:none;border-radius:14px;background:var(--fill);color:var(--tx);
+  font-variant-numeric:tabular-nums;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.code:focus{outline:none;box-shadow:0 0 0 4px var(--blue-s)}
+.code.bad{animation:shake .4s;box-shadow:0 0 0 4px var(--red-s)}
+@keyframes shake{10%,90%{transform:translateX(-2px)}30%,70%{transform:translateX(4px)}50%{transform:translateX(-4px)}}
+.err{min-height:19px;font-size:12.5px;color:var(--red);margin:9px 0 0;font-weight:500}
+.sheet .row{display:flex;gap:9px;margin-top:14px}
+.sheet .row .btn{flex:1;justify-content:center;text-align:center}
+.hint{margin-top:16px;padding-top:14px;border-top:.5px solid var(--sep2);
+  font-size:11.5px;color:var(--tx3);line-height:1.7}
+
+.btn.ic{padding:8px;border-radius:50%;display:grid;place-items:center;background:var(--card);
+  box-shadow:var(--sh-s);color:var(--tx2);flex:none}
+.btn.ic:hover{color:var(--blue);box-shadow:var(--sh-m)}
+.alerte{max-width:1360px;margin:12px auto 0;padding:11px 16px;border-radius:12px;
+  background:var(--red-f);color:#fff;font-size:13px;font-weight:500;line-height:1.5;
+  width:calc(100% - 48px);box-sizing:border-box}
+.p-b b{color:var(--blue)}
+.revs{padding:6px 10px 14px}
+.rev{padding:14px 14px 12px;border-bottom:.5px solid var(--sep2);display:flex;
+  flex-direction:column;gap:9px}
+.rev:last-child{border-bottom:none}
+.rev-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--tx3)}
+.rev-bon{font-weight:600;color:var(--tx);font-size:13.5px;font-variant-numeric:tabular-nums}
+.rev-vref{font-variant-numeric:tabular-nums}
+.rev-des{color:var(--tx2)}
+.rev-mid{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rev-lbl{font-size:10.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em}
+.rev-ocr{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
+  padding:3px 9px;border-radius:8px;background:var(--fill);color:var(--tx2)}
+.rev-fl{color:var(--tx3)}
+.rev-prop{font-weight:600;font-size:14px;letter-spacing:-.004em}
+.rev-act{display:flex;gap:8px}
+.rev .ok,.rev .ko{display:inline-flex;align-items:center;gap:7px;padding:7px 15px;
+  border-radius:99px;font-size:13px;font-weight:600;transition:transform .16s}
+.rev .ok{background:var(--green-f);color:#fff}
+.rev .ko{background:var(--fill);color:var(--tx2)}
+.rev .ok:hover,.rev .ko:hover{transform:scale(1.03)}
+.rev .ok:active,.rev .ko:active{transform:scale(.97)}
+.revin{font:inherit;font-size:14px;font-weight:600;padding:5px 11px;border:none;border-radius:9px;
+  background:var(--fill);color:var(--tx);min-width:210px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;box-shadow:0 0 0 3px var(--blue-s)}
+.revin:focus{outline:none}
+
+/* ===========================================================================
+   Colonne d'outils des lignes — poignée de déplacement et corbeille
+
+   Discrètes par défaut : au comptoir, l'œil doit tomber sur la référence et
+   la quantité, pas sur des icônes. Elles apparaissent au survol de la ligne,
+   et restent visibles en permanence sur écran tactile.
+   =========================================================================== */
+th.tp,td.tp{width:52px;padding-left:14px;padding-right:0;white-space:nowrap}
+.poignee,.corb{opacity:0;transition:opacity .15s,color .15s,transform .15s;color:var(--tx3)}
+tr:hover .poignee,tr:hover .corb{opacity:.75}
+.poignee{cursor:grab;font-size:11px;letter-spacing:-2px;user-select:none;
+  display:inline-block;vertical-align:middle;margin-right:2px}
+.poignee:active{cursor:grabbing}
+.poignee:hover{opacity:1;color:var(--tx2)}
+.corb{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
+  vertical-align:middle}
+.corb:hover{opacity:1;color:#fff;background:var(--red-f);transform:scale(1.08)}
+tr.drag td{opacity:.4}
+tr.sur-haut td{box-shadow:inset 0 2px 0 var(--blue)}
+tr.sur-bas td{box-shadow:inset 0 -2px 0 var(--blue)}
+
+/* ============ ligne ajoutée à la volée sur un bon existant ============ */
+.ajl td{background:var(--card2)}
+.si{font:inherit;font-size:13px;width:100%;padding:6px 10px;border:none;border-radius:9px;
+  background:var(--fill);color:var(--tx);transition:box-shadow .15s}
+.si:focus{outline:none;box-shadow:0 0 0 3px var(--blue-s)}
+.si.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  font-weight:600;letter-spacing:-.004em}
+.si.n{text-align:right;font-variant-numeric:tabular-nums}
+.serr{margin:10px 0 0;font-size:12.5px;color:var(--red);font-weight:500}
+
+/* ============ pied du tableau ============ */
+.tfoot{padding:12px 24px 4px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.tnote{font-size:11.5px;color:var(--tx3)}
+
+/* ============ saisie manuelle d'un bon ============ */
+.saisie{padding:20px 24px 24px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:14px 18px;
+  margin-bottom:22px}
+.ch{display:flex;flex-direction:column;gap:5px}
+.ch>span{font-size:11px;color:var(--tx3);letter-spacing:-.002em}
+.ch>span i{font-style:normal;color:var(--tx3);opacity:.75}
+.ch input,.ch select{font:inherit;font-size:14px;font-weight:500;padding:8px 11px;border:none;
+  border-radius:10px;background:var(--fill);color:var(--tx);width:100%;
+  transition:box-shadow .15s}
+.ch input:focus,.ch select:focus{outline:none;box-shadow:0 0 0 3px var(--blue-s)}
+.slignes table{font-size:13px}
+.slignes th{padding:8px 8px}
+.slignes td{padding:5px 8px;border-bottom:none}
+.sdel{width:26px;height:26px;border-radius:50%;font-size:17px;line-height:1;color:var(--tx3);
+  display:grid;place-items:center;transition:background .15s,color .15s}
+.sdel:hover:not(:disabled){background:var(--red-f);color:#fff}
+.sdel:disabled{opacity:.25;cursor:not-allowed}
+
+/* ============ divers ============ */
+.av.md{width:24px;height:24px;font-size:10.5px;letter-spacing:.2px}
+.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+.rev-motif{font-size:11.5px;color:var(--tx3);flex-basis:100%}
+/* Boutons secondaires de l'écran de contrôle (« Garder », « Modifier ») :
+   même gabarit que le bouton vert, mais en retrait — l'action recommandée
+   doit rester la seule à sauter aux yeux. */
+.rev .neutre{display:inline-flex;align-items:center;gap:7px;padding:7px 15px;border-radius:99px;
+  font-size:13px;font-weight:600;background:var(--fill);color:var(--tx2);
+  transition:transform .16s,color .16s}
+.rev .neutre:hover{transform:scale(1.03);color:var(--tx)}
+.rev .neutre:active{transform:scale(.97)}
+/* V/référence et n° de commande : corrigeables d'un clic, comme la quantité
+   due. Discret au repos — ce sont des valeurs à lire, pas des champs. */
+.ed{font:inherit;font-weight:inherit;font-size:inherit;letter-spacing:inherit;
+  font-variant-numeric:tabular-nums;color:inherit;padding:1px 7px;margin-left:-7px;
+  border-radius:7px;transition:background .15s,box-shadow .15s}
+.kv:hover .ed{background:var(--fill)}
+.ed:hover{box-shadow:inset 0 0 0 1px var(--sep)}
+.ed.corr{box-shadow:inset 0 0 0 1px var(--blue-f)}
+.entin{font:inherit;font-size:15px;font-weight:600;letter-spacing:-.012em;
+  font-variant-numeric:tabular-nums;width:150px;padding:1px 7px;margin-left:-7px;
+  border:none;border-radius:7px;background:var(--fill);color:var(--tx);
+  box-shadow:0 0 0 3px var(--blue-s)}
+.entin:focus{outline:none}
+
+/* la pastille de l'opérateur et l'horodatage se touchaient */
+.trace{display:flex;align-items:center;gap:5px}
+.btn.nouv{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:var(--card);
+  box-shadow:var(--sh-s);font-size:13px;font-weight:600;color:var(--tx2);flex:none;
+  white-space:nowrap}
+.btn.nouv:hover{color:var(--blue);box-shadow:var(--sh-m)}
+.btn.nouv[aria-pressed="true"]{background:var(--blue-f);color:#fff}
+@media (hover:none){.poignee,.corb{opacity:1}}
+
+
+/* ===========================================================================
+   Couche d'habillage — élévation, verre, mouvement
+
+   Ces règles arrivent après toutes les autres : elles ne redéfinissent pas la
+   mise en page, elles la soulèvent. Chaque effet est là pour dire quelque
+   chose — ce qui est au-dessus, ce qui répond au doigt, ce qui vient de
+   changer — jamais pour décorer.
+   =========================================================================== */
+
+/* ---- hiérarchie par la graisse, quatre niveaux ------------------------- */
+/* H1 la valeur mise en avant, H2 le titre de carte, H3 la ligne de liste,
+   H4 l'étiquette. C'est la graisse qui range, pas la couleur. */
+.kv.big b{font-weight:700;letter-spacing:-.03em}
+.rev-bon,.bn,.hjd{font-weight:600}
+.kv b,.rev-prop{font-weight:600}
+.kv span,.rev-lbl,th,.hjn,.tnote,.ch>span{font-weight:500}
+h1,h2,h3{margin:0}
+
+/* ---- fond de page : une nappe de bleu très diffuse, pour que le noir ne
+        soit pas plat. Fixe, donc elle ne bouge pas au défilement. ---------- */
+body{
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(0,102,255,.16), transparent 62%),
+    radial-gradient(900px 520px at 92% 4%, rgba(90,160,255,.10), transparent 58%),
+    var(--bg);
+  background-attachment:fixed;
+}
+
+/* ---- verre : la barre du haut et les modales flottent au-dessus --------- */
+.top{
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(22px) saturate(180%);
+  backdrop-filter:blur(22px) saturate(180%);
+  border-bottom:1px solid var(--glass-bord);
+  box-shadow:0 8px 32px rgba(0,0,0,.45);
+}
+.ov{
+  background:var(--voile);
+  -webkit-backdrop-filter:blur(14px) saturate(140%);
+  backdrop-filter:blur(14px) saturate(140%);
+}
+.sheet{
+  background:linear-gradient(180deg,var(--verre-haut),var(--verre-bas));
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  backdrop-filter:blur(28px) saturate(180%);
+  border:1px solid var(--glass-bord);
+  box-shadow:var(--sh-l),var(--reflet);
+}
+
+/* ---- cartes : liseré de reflet en haut + ombre portée ------------------- */
+.card{
+  border:1px solid var(--sep2);
+  box-shadow:var(--sh-m),var(--reflet);
+  background:linear-gradient(180deg,var(--card2),transparent 180px),var(--card);
+}
+
+/* ---- boutons : lévitation au survol, enfoncement au clic ---------------- */
+.btn{
+  box-shadow:var(--sh-s),var(--reflet);
+  transition:transform var(--t-clic) ease, box-shadow var(--t-clic) ease,
+             background var(--t-clic) ease, color var(--t-clic) ease,
+             opacity var(--t-clic) ease;
+}
+.btn:hover:not(:disabled){transform:translateY(-1px) scale(1.02);box-shadow:var(--sh-m),var(--reflet)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.975)}
+.btn.pri{
+  background:linear-gradient(180deg,#2E82FF,var(--acc));
+  box-shadow:var(--sh-acc),var(--reflet);
+}
+.btn.pri:hover:not(:disabled){box-shadow:0 10px 28px rgba(0,102,255,.5),var(--reflet)}
+.btn.ic:hover{color:var(--acc-hi)}
+.btn.ic[aria-pressed="true"]{background:var(--acc);color:#fff;box-shadow:var(--sh-acc)}
+.btn.nouv[aria-pressed="true"]{background:var(--acc);color:#fff;box-shadow:var(--sh-acc)}
+.step button:hover:not(:disabled){background:var(--acc-lo);color:var(--acc-hi)}
+
+/* ---- lignes de liste : le survol soulève, la sélection s'ancre ---------- */
+.item{
+  transition:background var(--t-clic) ease, transform var(--t-clic) ease,
+             box-shadow var(--t-clic) ease;
+}
+.item:hover{background:var(--card2);transform:translateX(2px)}
+.item[aria-current="true"]{
+  background:linear-gradient(90deg,var(--acc-lo),transparent);
+  box-shadow:inset 3px 0 0 var(--acc);
+}
+tbody tr:hover td{background:rgba(90,160,255,.05)}
+tr.flash td{background:var(--acc-halo)}
+
+/* ---- champs : anneau de focus bleu -------------------------------------- */
+.si:focus,.ch input:focus,.ch select:focus,.code:focus,.duin,.revin,.entin{
+  box-shadow:0 0 0 3px var(--acc-halo);
+}
+.srch input:focus{outline:none}
+.srch:focus-within{box-shadow:0 0 0 3px var(--acc-halo);border-radius:99px}
+
+/* ---- pastilles du haut -------------------------------------------------- */
+.pill{transition:transform var(--t-clic) ease, box-shadow var(--t-clic) ease,
+  background var(--t-clic) ease}
+.pill:hover{transform:translateY(-1px);box-shadow:var(--sh-m)}
+/* Une pastille active garde SA couleur, en aplat plein : c'est ce qui dit
+   quel filtre est en cours sans avoir à lire l'étiquette. L'ancienne règle
+   inversait en blanc — illisible et hors sujet sur fond sombre. */
+.pill[aria-pressed="true"]{color:#fff;box-shadow:var(--sh-m),var(--reflet)}
+.pill[aria-pressed="true"] b,
+.pill[aria-pressed="true"] span{color:#fff !important;opacity:1}
+.pill[aria-pressed="true"] span{opacity:.82}
+.p-red[aria-pressed="true"]{background:var(--red-f)}
+.p-org[aria-pressed="true"]{background:var(--orange-f)}
+.p-b[aria-pressed="true"]{background:var(--acc)}
+
+/* ---- apparition du panneau de droite ------------------------------------ */
+@keyframes monte{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#detail>.dh,#detail>.tw,#detail>.histo,#detail>.saisie,#detail>.revs{
+  animation:monte var(--t-etat) var(--e-sortie) both;
+}
+
+/* ===========================================================================
+   Historique des livraisons d'un bon
+   =========================================================================== */
+.histo{padding:6px 12px 18px}
+.hj{
+  display:flex;align-items:baseline;gap:12px;margin:16px 12px 8px;
+  padding-bottom:7px;border-bottom:1px solid var(--sep2);
+}
+.hjd{font-size:13.5px;color:var(--tx);letter-spacing:-.01em}
+.hjn{font-size:11.5px;color:var(--tx3);margin-left:auto}
+.hm{
+  display:grid;grid-template-columns:52px minmax(120px,auto) 1fr auto auto 24px;
+  gap:12px;align-items:center;padding:9px 12px;border-radius:var(--r-s);
+  transition:background var(--t-clic) ease;
+}
+.hm:hover{background:var(--card2)}
+.hh{font-size:12px;color:var(--tx3);font-variant-numeric:tabular-nums}
+.hr{font-size:13px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.hd{font-size:12.5px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hq{
+  font-size:12.5px;color:var(--tx2);font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:var(--fill);padding:3px 10px;border-radius:99px;
+}
+.hq i{font-style:normal;color:var(--tx3);margin:0 5px}
+.hv{
+  font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;
+  min-width:34px;text-align:right;
+}
+.hv.p{color:var(--green)}
+.hv.n{color:var(--red)}
+.ho{display:inline-flex}
+
+/* ---- respect du réglage système ---------------------------------------- */
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important;transition-duration:.01ms !important}
+  .item:hover,.btn:hover:not(:disabled){transform:none}
+}
+
+
+/* ===========================================================================
+   Thème clair
+
+   Seules les variables changent : pas une seule règle de mise en page n'est
+   dupliquée. Les quatre aplats (bleu, vert, orange, rouge) sont identiques
+   dans les deux thèmes — le blanc dessus passe partout, vérifié au calcul :
+     blanc / bleu 4,8:1 · vert 5,4 · orange 4,7 · rouge 5,6
+   et en clair : texte principal 18,3:1 · secondaire 7,0 · accent 7,0.
+
+   Trois états possibles : « sombre », « clair », et rien — auquel cas on suit
+   le réglage du système. C'est le défaut : un poste réglé en clair ouvre
+   l'outil en clair, sans que personne n'ait à toucher au bouton.
+   =========================================================================== */
+:root[data-theme="light"]{
+  --bg:#EEF2FA; --card:#FFFFFF; --card2:#F4F7FD; --fill:#E7EDF9;
+  --tx:#0B1526; --tx2:#4A5A76; --tx3:#7A8AA6;
+  --sep:rgba(11,40,90,.16); --sep2:rgba(11,40,90,.08);
+  --acc:#0066FF; --acc-hi:#0B4FCC; --acc-lo:#DDE8FF; --acc-halo:rgba(0,102,255,.20);
+  --green:#0F7A52; --orange:#A96410; --red:#C0342C;
+  --sh-s:0 1px 2px rgba(16,40,80,.07);
+  --sh-m:0 2px 6px rgba(16,40,80,.07),0 12px 32px rgba(16,40,80,.09);
+  --sh-l:0 24px 64px rgba(16,40,80,.22),0 4px 12px rgba(16,40,80,.12);
+  --sh-acc:0 6px 20px rgba(0,102,255,.28);
+  --reflet:inset 0 1px 0 rgba(255,255,255,.9);
+  --glass:rgba(255,255,255,.62);
+  --glass-bord:rgba(11,40,90,.10);
+  --voile:rgba(20,40,80,.30);
+  --verre-haut:rgba(255,255,255,.96); --verre-bas:rgba(238,243,252,.98);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF2FA; --card:#FFFFFF; --card2:#F4F7FD; --fill:#E7EDF9;
+    --tx:#0B1526; --tx2:#4A5A76; --tx3:#7A8AA6;
+    --sep:rgba(11,40,90,.16); --sep2:rgba(11,40,90,.08);
+    --acc:#0066FF; --acc-hi:#0B4FCC; --acc-lo:#DDE8FF; --acc-halo:rgba(0,102,255,.20);
+    --green:#0F7A52; --orange:#A96410; --red:#C0342C;
+    --sh-s:0 1px 2px rgba(16,40,80,.07);
+    --sh-m:0 2px 6px rgba(16,40,80,.07),0 12px 32px rgba(16,40,80,.09);
+    --sh-l:0 24px 64px rgba(16,40,80,.22),0 4px 12px rgba(16,40,80,.12);
+    --sh-acc:0 6px 20px rgba(0,102,255,.28);
+    --reflet:inset 0 1px 0 rgba(255,255,255,.9);
+    --glass:rgba(255,255,255,.62);
+    --glass-bord:rgba(11,40,90,.10);
+    --voile:rgba(20,40,80,.30);
+    --verre-haut:rgba(255,255,255,.96); --verre-bas:rgba(238,243,252,.98);
+    color-scheme:light;
+  }
+}
+
+/* ---- la nappe de fond, plus franche -------------------------------------
+   Trois foyers de couleur au lieu de deux, posés hors cadre pour qu'on ne
+   voie que leur diffusion. Fixe : elle ne défile pas avec le contenu. */
+body{
+  background:
+    radial-gradient(1100px 700px at 8% -12%,  rgba(0,102,255,.30),  transparent 60%),
+    radial-gradient(900px 620px at 96% -4%,   rgba(90,160,255,.22), transparent 58%),
+    radial-gradient(1000px 800px at 50% 112%, rgba(0,72,190,.22),   transparent 62%),
+    var(--bg) !important;
+  background-attachment:fixed !important;
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) body{
+    background:
+      radial-gradient(1100px 700px at 8% -12%,  rgba(0,102,255,.16),  transparent 60%),
+      radial-gradient(900px 620px at 96% -4%,   rgba(90,160,255,.14), transparent 58%),
+      radial-gradient(1000px 800px at 50% 112%, rgba(0,72,190,.10),   transparent 62%),
+      var(--bg) !important;
+  }
+}
+:root[data-theme="light"] body{
+  background:
+    radial-gradient(1100px 700px at 8% -12%,  rgba(0,102,255,.16),  transparent 60%),
+    radial-gradient(900px 620px at 96% -4%,   rgba(90,160,255,.14), transparent 58%),
+    radial-gradient(1000px 800px at 50% 112%, rgba(0,72,190,.10),   transparent 62%),
+    var(--bg) !important;
+}
+
+/* ---- verre dépoli, plus lisible -----------------------------------------
+   Le flou seul ne se voit pas : ce qui fait le verre, c'est le flou PLUS un
+   filet clair en haut de la surface, qui imite l'arête d'une plaque. */
+.top,.ov,.sheet,.carte,.card,.cle{
+  -webkit-backdrop-filter:blur(26px) saturate(190%);
+  backdrop-filter:blur(26px) saturate(190%);
+}
+.card,.carte{
+  position:relative;
+  background:
+    linear-gradient(150deg,rgba(150,190,255,.14),rgba(150,190,255,.02) 42%,transparent 70%),
+    var(--card);
+  border:1px solid var(--glass-bord);
+  box-shadow:var(--sh-m),var(--reflet);
+}
+/* le reflet oblique : une bande claire très diffuse en haut à gauche */
+.card::before,.carte::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(115deg,rgba(255,255,255,.10),transparent 38%);
+}
+.card>*,.carte>*{position:relative}
+.top{border-bottom:1px solid var(--glass-bord)}
+
+/* ---- le bouton de thème -------------------------------------------------- */
+.theme{
+  display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  background:var(--card);box-shadow:var(--sh-s),var(--reflet);color:var(--tx2);
+  flex:none;transition:transform var(--t-clic) ease,box-shadow var(--t-clic) ease,
+  color var(--t-clic) ease;
+}
+.theme:hover{color:var(--acc-hi);box-shadow:var(--sh-m),var(--reflet);transform:translateY(-1px)}
+.theme:active{transform:translateY(0) scale(.94)}
+.theme svg{display:block}
+
+/* ===========================================================================
+   Préparation et livraison
+
+   Deux temps, deux signes visuels qu'on ne confond pas :
+     le PRÉPARÉ est bleu — c'est l'action en cours, elle appelle un geste ;
+     le LIVRÉ est vert — c'est acquis, il n'y a plus rien à faire.
+   =========================================================================== */
+
+/* ---- jauge à deux niveaux dans la liste ---------------------------------
+   Le trait clair dessous montre jusqu'où la marchandise est prête ; le trait
+   plein par-dessus, jusqu'où elle est réellement partie. L'écart entre les
+   deux, c'est ce qui attend sur l'étagère. */
+.bar{position:relative}
+.bar u{position:absolute;inset:0 auto 0 0;display:block;height:100%;border-radius:2px;
+  background:var(--acc);opacity:.45;transition:width var(--t-bloc) var(--e-bloc)}
+.bar i{position:relative;z-index:1}
+.item.s-late .bar i{background:var(--red)}
+.item.s-warn .bar i{background:var(--orange)}
+.item.s-prepa .bar i{background:var(--green)}
+
+/* ---- ligne en préparation dans le tableau du bon -------------------------
+   Pas de fond teinté : la ligne garde le survol ordinaire, comme toutes les
+   autres. Le badge « En préparation » et la pastille de quantité suffisent à
+   dire l'état — un aplat coloré derrière le texte, sur une ligne qu'on vient
+   de toucher, ressemble à une erreur plus qu'à une information. */
+.pastille{
+  margin-left:7px;padding:1px 7px;border-radius:99px;background:var(--acc);color:#fff;
+  font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.6;
+}
+.liv{font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)}
+.liv.z{color:var(--tx3);font-weight:400}
+
+/* ---- pied du bon : les trois chiffres de l'état ------------------------- */
+.foot{gap:22px}
+.cpt{display:inline-flex;align-items:baseline;gap:6px}
+.cpt b{font-size:16px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+.cpt.pre b{color:var(--acc-hi)}
+.cpt.res b{color:var(--orange)}
+
+/* ---- fenêtre de confirmation de livraison ------------------------------- */
+.sheet.large{width:min(560px,100%);text-align:left}
+.sheet.large h3,.sheet.large>p{text-align:center}
+.clist{
+  max-height:46vh;overflow:auto;margin:6px 0 0;padding:4px 0;
+  border-top:1px solid var(--sep2);border-bottom:1px solid var(--sep2);
+}
+.cl{
+  display:grid;grid-template-columns:minmax(110px,auto) 1fr auto;gap:12px;
+  align-items:center;padding:8px 4px;border-bottom:1px solid var(--sep2);
+}
+.cl:last-child{border-bottom:none}
+.clr{font-size:13px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.clr em{font-style:normal;color:var(--tx3);font-weight:400;margin:0 1px}
+.cld{font-size:12.5px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.clq{
+  min-width:34px;text-align:center;padding:3px 10px;border-radius:99px;
+  background:var(--acc);color:#fff;font-size:12.5px;font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
+.cltot{margin:14px 0 0;text-align:center;font-size:13px;color:var(--tx2)}
+.cltot b{color:var(--tx);font-weight:700;font-variant-numeric:tabular-nums}
+.sheet.large .row .btn{flex:1}
+
+/* ===========================================================================
+   Impression — feuilles remises au client
+
+   Le bon de livraison (.bl) est calqué au point près sur le devis Barrault :
+   même bandeau, même cadre destinataire à 298pt, même grille de colonnes à
+   302,8pt, mêmes cases grises #EBEBEB séparées par 1,8pt de blanc. D'où le
+   positionnement absolu en points plutôt qu'une mise en page fluide : la
+   fidélité prime, et le format A4 est fixe de toute façon.
+
+   Le récapitulatif (.rec) garde sa mise en page simple, il n'est pas destiné
+   au même usage.
+   =========================================================================== */
+#print{display:none}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  /* Sans cela le navigateur peint les marges dans le ton sombre déclaré par
+     color-scheme : une bande noire sur les bords de chaque page. */
+  :root{color-scheme:light}
+  /* La nappe de fond du theme est posee sur « :root[data-theme="light"] body »
+     avec !important : une regle « body » toute simple, meme !important, perd
+     sur la specificite et le bleu partait a l'imprimante. On repete :root
+     pour passer devant, sans dependre de l'ordre des blocs. Et la feuille
+     elle-meme porte du blanc opaque : quoi qu'il y ait derriere, le papier
+     reste blanc. */
+  html,body,:root:root:root body{
+    background:#fff !important;
+    background-image:none !important;
+    background-attachment:scroll !important;
+  }
+  #print,#print .pf{background:#fff !important}
+  body>*{display:none !important}
+  #print{display:block !important;color:#000}
+
+  /* ---------- bon de livraison ---------- */
+  #print .bl{position:relative;width:595pt;height:841pt;overflow:hidden;
+    font:8pt/1.2 Arial,Helvetica,"Liberation Sans",sans-serif;color:#000}
+  #print .bl .hz{position:relative;height:302.8pt}
+  #print .bl .ban{position:absolute;left:4pt;top:4pt;width:582pt;height:auto}
+  #print .bl .t{position:absolute;white-space:nowrap;line-height:1.05}
+  #print .bl .cbz{position:absolute;left:469pt;top:237pt;width:117pt;height:13pt}
+  #print .bl .cb{width:100%;height:100%;display:block}
+
+  /* cases grises du bandeau d'informations et du pavé de synthèse */
+  #print .bl .ic{position:absolute;top:266.8pt;height:13.4pt;line-height:13.4pt;
+    background:#EBEBEB;font-size:8pt;text-align:center;overflow:hidden;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print .bl .iv{position:absolute;top:281pt;text-align:center;line-height:1.15;
+    white-space:nowrap;overflow:hidden}
+
+  /* tableau des lignes : les « bordures » du devis sont en réalité
+     1,8pt de blanc entre deux aplats gris */
+  #print .bl table.ln{border-collapse:separate;border-spacing:1.8pt 0;
+    table-layout:fixed;width:572.4pt;margin-left:15.2pt}
+  #print .bl table.ln th{background:#EBEBEB;height:14.3pt;font-size:9pt;
+    font-weight:400;text-align:center;padding:0;vertical-align:middle;border:none;
+    color:#000;text-transform:none;letter-spacing:0;white-space:nowrap;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print .bl table.ln th:nth-child(1){width:90pt}
+  #print .bl table.ln th:nth-child(2){width:290pt}
+  #print .bl table.ln th:nth-child(3),
+  #print .bl table.ln th:nth-child(4){width:93.5pt}
+  #print .bl table.ln thead{display:table-header-group}
+  #print .bl table.ln tr{page-break-inside:avoid}
+  /* Le corps du tableau monte de 8 a 9pt : ce papier se lit debout, a bout de
+     bras, souvent sur un quai. Un point de plus ne change pas la mise en page
+     du devis (les colonnes sont fixes) mais change la lecture. */
+  #print .bl table.ln td{padding:1.8pt 0 1.8pt 11.2pt;vertical-align:top;font-size:9pt;
+    border:none;color:#000}
+  #print .bl table.ln td.rf{font-weight:bold;white-space:nowrap;padding-left:1pt}
+  #print .bl table.ln td.q{text-align:right;padding-right:24pt;padding-left:0;
+    white-space:nowrap}
+  #print .bl table.ln tr.ref td{padding-top:4pt;font-size:9pt}
+  #print .bl table.ln tr.zn td{background:#EBEBEB;font-weight:bold;font-size:8.8pt;
+    letter-spacing:.03em;padding:3.4pt 0 3.4pt 4pt;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+  /* La respiration entre deux sections. Une ligne vide, rien d'autre : pas de
+     fond, pas de trait — c'est l'absence qui separe. */
+  #print .bl table.ln tr.esp td{padding:0;height:9pt;background:none;border:none}
+
+  /* pavé de synthèse : à la hauteur du pavé de totaux du devis quand le
+     tableau le permet, à la suite des lignes sinon */
+  #print .bl .edite{position:absolute;left:17pt;top:612pt;font-size:7pt;color:#444}
+
+  /* ---------- cadre a faire tamponner ----------
+     En bas a droite, sous le tableau : les lignes s'arretent a 590pt, la zone
+     est donc libre quelle que soit la longueur du bon. Assez grand pour un
+     tampon d'administration (les cachets de service font couramment 45mm),
+     assez sobre pour ne pas concurrencer le contenu. */
+  #print .bl .tmp{
+    position:absolute;left:390pt;top:648pt;width:190pt;height:104pt;
+    border:.8pt solid #000;
+  }
+  #print .bl .tmp .tt{
+    background:#EBEBEB;font-size:7.2pt;font-weight:bold;letter-spacing:.03em;
+    text-align:center;padding:3pt 2pt;border-bottom:.8pt solid #000;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+
+
+
+  /* ---------- récapitulatif ---------- */
+  #print .rec{padding:14mm 12mm;
+    font:12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+  #print .pf{page-break-after:always}
+  #print .pf:last-child{page-break-after:auto}
+  #print .rec .ph{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+    border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:13px}
+  #print .rec .pmarq{font-size:16px;font-weight:700;letter-spacing:.2px}
+  #print .rec .psub{font-size:11px;color:#444;margin-top:2px}
+  #print .rec .ptit{font-size:14px;font-weight:700;text-align:right;max-width:46%}
+  #print .rec .pmeta{display:flex;flex-wrap:wrap;gap:4px 26px;margin-bottom:14px;font-size:11.5px}
+  #print .rec .pmeta span{color:#555}
+  #print .rec .pmeta b{font-weight:700}
+  #print .rec table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}
+  #print .rec th:nth-child(1),#print .rec td:nth-child(1){width:26%}
+  #print .rec th:nth-child(3),#print .rec td:nth-child(3),
+  #print .rec th:nth-child(4),#print .rec td:nth-child(4),
+  #print .rec th:nth-child(5),#print .rec td:nth-child(5){width:14%}
+  #print .rec thead{display:table-header-group}
+  #print .rec tr{page-break-inside:avoid}
+  #print .rec th{text-align:left;border-bottom:1.5px solid #000;padding:5px 6px;
+    font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#000}
+  #print .rec td{border-bottom:.5px solid #c4c4c4;padding:5px 6px;vertical-align:top}
+  #print .rec .n{text-align:right;white-space:nowrap}
+  #print .rec .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;white-space:nowrap}
+  #print .rec tr.reste td{font-weight:700}
+  #print .rec tr.reste td.d{font-weight:400}
+  #print .rec .pbloc{page-break-inside:avoid;margin-bottom:15px}
+  #print .rec .pbt{font-size:12.5px;font-weight:700;margin:0 0 4px;
+    display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+  #print .rec .pbt span{font-size:10.5px;font-weight:400;color:#555;text-align:right}
+  #print .rec .ptot{margin:12px 0 0;font-size:12px}
+  #print .rec .pfoot{margin-top:9px;padding-top:6px;border-top:.5px solid #999;
+    font-size:9.5px;color:#555}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="topin">
+    <div class="brand"><b>SDIS 33</b><span>Le Haillan</span></div>
+    <div class="srch">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.6-3.6"></path></svg>
+      <input id="q" type="search" autocomplete="off" placeholder="Bon, V/r&eacute;f&eacute;rence ou r&eacute;f&eacute;rence article">
+    </div>
+    <div class="pills">
+      <button class="pill p-red" id="pLate" aria-pressed="false"><b>0</b><span>En retard</span></button>
+      <button class="pill p-org" id="pRal" aria-pressed="false"><b>0</b><span>Lignes RAL</span></button>
+      <button class="pill p-b" id="pVerif" aria-pressed="false" hidden><b>0</b><span>&Agrave; v&eacute;rifier</span></button>
+    </div>
+    <button class="theme" id="theme" title="Changer de th&egrave;me"></button>
+    <button class="btn nouv" id="nouveau" aria-pressed="false" title="Saisir un bon &agrave; la main">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Nouveau bon</button>
+    <button class="btn nouv" id="recap" title="Imprimer le r&eacute;capitulatif de tous les articles en attente">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>R&eacute;cap RAL</button>
+    <button class="btn ic" id="refresh" title="Rafraichir"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    <button class="who" id="who"><span class="av anon">?</span><span id="whoTx">S'identifier</span></button>
+  </div>
+</header>
+
+<p class="alerte" id="bandeau" hidden></p>
+<p class="note"><b>Rodage.</b> Les liasses papier continuent de circuler en parallèle &mdash; comparez, et signalez-moi tout écart.</p>
+
+<div class="wrap">
+  <section class="card">
+    <div class="ctrl">
+      <div class="seg" id="seg">
+        <button data-f="all" aria-pressed="true">Tous</button>
+        <button data-f="ral" aria-pressed="false">Avec RAL</button>
+        <button data-f="late" aria-pressed="false">En retard</button>
+      </div>
+      <select id="fop" aria-label="Filtrer par op&eacute;rateur"><option value="">Tous les op&eacute;rateurs</option></select>
+    </div>
+    <div class="lwrap" id="lwrap"></div>
+  </section>
+  <section class="card" id="detail"></section>
+</div>
+
+<!-- Feuilles remises au client. Vide et invisible tant qu'on n'imprime pas. -->
+<div id="print" aria-hidden="true"></div>
+
+<script>
+/* Catalogue des références déjà vendues à ce client, pour l'autocomplétion. */
+var CATALOGUE = [["3M  Q08694","L'UNITE MASTIC D'ETANCHEITE PO"],["AGRAAGRA","RETRO CLIO"],["AM  320.13.0033","PIGNON VILEBREQ.CR   320."],["AM  894.12.0038","GUIDE ROULEAU"],["BACQ162910","RELAI 24V"],["BARD1045","ANTI USURE BV MANUEL.150ML"],["BARD1099","STOP FUITE RADIATEUR 500ML"],["BARD2244","DECRASSANT FAP 600ML"],["BARD2377","DECRASSANTS MOT.500ML"],["BARD44662","DECOLLE ETIQUETTES 250ML"],["BARD9365","DECALAMINANT DIESEL 5 EN 1 1L"],["BARDTICPE 16","TAXE INT.CONS.S/PROD.ENERG"],["BARDTICPE 26","TAXE INT.CONS.S/PROD.ENERG"],["BARR44554","NETTOY.DÉGRAIS.BARRAULT 600MLattente integrati"],["BMCABM11253H","HOMOLOGATED DIESEL CAT   DPF"],["BOSA255033","ACC CITR CAOUTC 91 K"],["BOSC0204114197","KIT SUP PRO KS197"],["BOSC0250212009","BOUGIE PRECH. DURATERM GLP224"],["BOSC0250403012","BOUGIE PRECH. DURATERM GLP221"],["BOSC0445110076ERP","INJECTEUR CR"],["BOSC0986435022","INJECTEUR"],["BOSC0986435350","INJECTEUR"],["BOSC0986478618","PRIX UNIT DISQ - BD536 BOITE D"],["BOSC0986479F74","PRIX UNIT DISQ RLMT - BD2819 B"],["BOSC0986594504","CAPT VITESSE ROUE WS504"],["BOSC0986594505","CAPT VITESSE ROUE WS505"],["BOSC3397008937","BEG AEROTWIN AR550U X1"],["BOSC3397011310","BEG PL TWIN N66 X 1"],["BOSCCONSIGNE 10","CONSIGNE BOSCH"],["BOSCCONSIGNE 10 VM","CONSIGNE BOSCH VIEILLE MAT."],["BREMP 61 066","JEU PLAQUETTES FR"],["CASCCWM15195AS","MOTEUR ESSUIE-GLACE PSA"],["CASCCWS15114AS","SYSTEME ESSUIE-GLACE CITROEN"],["CEVA4170","AL(ES) RENAULT - OPEL - NISSAN"],["CLASSA 2019BL","MANOMETRE 0-40BAR + FLEXIBLE"],["DAYC6PK894","COURROIE STRIEE"],["DAYCKTB886","KIT DISTRIBUTION"],["DEPA3208600","TRANSM.REN KANGOO DCI D"],["DEPACONSIGNE 8","CONSIGNE DEPA"],["DEPASVL001","SOUFFL.UNIV.TRANSM.VL"],["DIPACONSIGNE 1","CONSIGNE DIPA"],["DIPAFAPS028R","RESERVOIR ADBLUE"],["EEC CONSIGNE CATA.","CONSIGNE EEC"],["EEC VX6103T","FAP CAT/FAP"],["ELPA51277271","KIT DE REPARATION DE CABLE"],["ERA 220021A","DEMARREUR"],["ERA 220184A","DEMARREURCR    452."],["ERA 220353A","DEMARREUR"],["ERA 551567","CAPT.TEMP.ECHAPP."],["FEBI102060","TRANSMETTEUR DE PRESSION"],["FEBI105958","POULIE DAMPER"],["FEBI107821","FILTRE A UREE ADBLUE"],["FEBI173282","LAMPES"],["FEBI173290","LAMPES"],["FEBI178053","ETRIER DE FREIN"],["FEBI178066","ETRIER DE FREIN"],["FEBI178067","ETRIER DE FREIN"],["FEBI180293","KIT DE SOUFFLET DE DIRECTION"],["FEBI184712","KIT COURROIES TRAPEZOIDALES A"],["FEBI39227","KIT DE SOUFFLET DE DIRECTION"],["FEBI45862","SUPPORT DE MOTEUR"],["FEBI46666","VIS DE ROUE"],["GATE09-0911","TUYAU DE TURBO VL"],["GATE09-1454","TUYAU DE TURBO VL"],["GATEK016PK1025","KIT MICRO V"],["GATEK027PK1675","KIT MICRO V"],["GATEK057PK1973","KIT MICRO V"],["GATETH40683G1","THERMOSTAT"],["GATETVD1176A","POULIE DAMPER"],["HELL1G4 003 470-031","PROJECTEUR DE TRAVAIL"],["HELL2JA 346 720-121","LISEUSE LED FLEX CAPUCHON NOIR"],["HELL2KA 003 168-021","FEU ECLAIREUR DE PLAQUE"],["HELL2PF 003 389-037","FEU D ENCOMBREMENT"],["HELL2PS 006 717-031","FEU LATERAL"],["HELL2PS 964 295-061","FEU LATERAL"],["HELL4RD 007 794-021","RELAIS INV 12V (5P) 40/20A +RE"],["HELL6FH 007 832-081","INTERRUPTEUR"],["HELL6PT 358 181-751","PALPEUR, TEMPERATURE DES GAZ"],["HELL6PU 012 679-911","CAPTEUR, VITESSE DE ROUE"],["HELL8GM 002 091-141","AMPOULE, FEU DE RECUL"],["HELL8JD 743 708-001","PORTE-FUSIBLES"],["HELL8RA 002 020-001","CATADIOPTRECR   11."],["HELL8RA 002 020-002","CATADIOPTRE"],["HELL9EL 132 215-001","DISPERSEUR"],["HELL9EL 141 135-031","DISPERSEUR"],["HELL9EL 862 140-001","CABOCHON KL 7000 BLEU"],["HELL9SL 706 729-011","CLECR   31."],["INA 529016510","KIT COURROIE ACCESSOIRES"],["INA 529031710","KIT COURROIE ACCESSOIRES"],["INA 530004010","KIT DE DISTRIBUTION"],["INA 532022010","GALET DISTRIBUTION VL"],["INTF027BL","BOUCHON DE RESERVOIR UNIVERSEL"],["INTF10102BL","TETE DE FILTRE A GASOIL TYPE C"],["INTF10702","INJECTEUR ADBLUE CITROEN  BERL"],["INTF108","SOCLE METAL 7 PLOTS  POUR ATTE"],["INTF2230","FEU A PLAQUER CRISTAL / ROUGE"],["INTF608","BAGUE D ETANCHEITE 29 X 47 X 1"],["INTF609","BAGUE D ETANCHEITE 40 X 58 X 1"],["INTF883","ECLAIREUR DE PLAQUE 4 LEDS PRE"],["JAKOJ3271015","JEU DE DOUILLES DE GUIDAGE, ET"],["JAKOJ3402042","TAMBOUR DE FREIN"],["KS  160.0760","CRIC 3 BOUDINS, 2T - COMMANDE"],["LOCT1133306","SI 5910 SILICONE MONOC.BL 40ML"],["LOCT1370559","243 FREINFILET MOY.BL-FL 24MLLOCTITE"],["LOCT2068186","577 TUBETANCHE AC 50MLLOCTITECR   1."],["LUCAACP01162","EXCHANGE AC COMPRESSOR"],["LUK 415093510","VOLANT BIMASSE"],["LUK 600020100","KIT EMBRAYAGE LUKBOX"],["LUK 622309635","KIT EMBRAYAGE REPSET PRO"],["MAGNLPR911","PROJ.D FULL LED ELEC CLIO IV R"],["MAGNLPR912","PROJ.G FULL LED ELEC CLIO IV R"],["MANNC14210/2","FILTRE A AIR"],["MANNCF850/2","FILTRE A AIR"],["MANNW940/10","FILTRE A HUILE"],["MANNWK8190","FILTRE A CARBURANT"],["MEAT88463","RADIATEUR VANNE EGR"],["MEIL016214B","KIT VIS DE CULASSE RENAU 1.9 D"],["MEIL12018755B","JOINT D ARBRE RADIAL - BA AVEC"],["MEIL20034710B","BF   23,00 X 47,00 X 64,50 / M"],["MGA 1164","PLAQUETTES"],["MGA 1271","PLAQUETTES"],["MGA 1334","PLAQUETTES"],["MGA 1425","PLAQUETTES"],["MGA AM5612","AMORTISSEUR AV MC PHERSON"],["MGA AM5856","AMORTISSEUR AV MAC PHERSON"],["MGA BP710","BOUGIE PRECHAUFFAGE"],["MGA CABS119","CAPTEUR ABS"],["MGA CS60894","COURROIE 6PK894"],["MGA CS60895","COURROIE 6PK895"],["MGA D1391","PAIRE DISQUES"],["MGA D1803","PAIRE DISQUES"],["MGA D1872R","PAIRE DISQ+RLT+BAG ABS"],["MGA D2153","PAIRE DISQUES"],["MGA DA5717","2 SOUFFLETS DIRECTION"],["MGA DR8881","ROTULE DIRECTION"],["MGA FA3019","FILTRE A AIR"],["MGA FA3376","FILTRE A AIR"],["MGA FG2201","FILTRE A GAZOLE"],["MGA FH1175","FILTRE A HUILE"],["MGA FH1196","FILTRE A HUILE"],["MGA KM1275","KIT MONTAGE AMORTISSEUR AV"],["MGA KM1277","KIT MONTAGE AMORTISSEUR AV"],["MGA KP2595","KIT 2 SOUFFLETS + BUTEES AM AV"],["MGA SB7078","TRIANGLE COMPLET."],["MGA SM1422","SUPPORT MOTEUR"],["MGA SR5702","ROTULE SUSPENSION"],["MGA SR5703","ROTULE SUSPENSION"],["MGA W531","POMPE A EAU MGA"],["MONRG1105","AMORT AR RENAULT KANGOO 08"],["MONRG7277","AMORT AV RENAULT CLIO III"],["MONRG7323","AMORT. AVD CITROEN BERLINGO 08"],["MONRG7324","AMORT. AVG CITROEN BERLINGO 08"],["MONRG8173","AMORT AV RENAULT KANGOO"],["MONRPK124","KIT DE PROTECTION AV PEUGEOT 3"],["MONRPK392","KITS DE PROTECTION AV RENAULT"],["MOOGOP-BJ-12502","ROTULE DE SUSPENSION"],["MOOGPE-TC-0999","BRAS DE SUSPENSION"],["MOOGPE-TC-1032","BRAS DE SUSPENSION"],["NGK 2419","BOUG.PRECHAUFF.BTE/Y-506J"],["NGK 5921","BOUG.ALLUM.BTE/BM6A/OL."],["NGK 94117","VANNES EGR/EGE5-D002"],["NRF 48402","EGR - RENAULT TRAFIC 2.0D 06-"],["OCLAADBL010BV","ADBLUE 10L AVEC BEC VERSEUR"],["OSRA2825","ORIGINAL W5W 12V"],["OSRA2845","ORIGINAL W5W 24V"],["OSRA5627","ORIGINAL R5W 24V"],["OSRA64155","ORIGINAL H1 24V"],["OSRA64193","ORIGINAL H4 12V"],["OSRA64210","ORIGINAL H7 12V"],["OSRA64215","ORIGINAL H7 24V"],["OSRA7507","ORIGINAL PY21W 12V"],["OSRA921","ORIGINAL W16W 12V"],["PIER7.00368.15.0","VANNE EGR, MOTEUR ELECTRIQUE"],["PIER7.02552.71.0","MODULE D ALIMENTATION DE CARBU"],["PURFA1161","FILTRES A AIR"],["PURFA1569","FILTRES A AIR"],["PURFA1573","FILTRES A AIR"],["PURFA1798","FILTRES A AIR"],["PURFA3005","FILTRES A AIR"],["PURFA370","FILTRES A AIR"],["PURFAH245-2","FILTRE D HABITACLE"],["PURFAH273-2","FILTRE D HABITACLE"],["PURFAH282","FILTRE D HABITACLE"],["PURFAHC405","FILTRE D HABITACLE"],["PURFC875","FILTRES A CARBURANTS"],["PURFCS157A","FILTRES A CARBURANTS"],["PURFL1125","FILTRES A HUILE"],["PURFL343D","FILTRES A HUILE"],["PURFL460","FILTRES A HUILE"],["PURFL470","FILTRES A HUILE"],["PURFL989","FILTRES A HUILE"],["PURFLS867B","FILTRES A HUILE"],["PURFLS932","FILTRES A HUILE"],["PURFLS946","FILTRES A HUILE"],["REPIRA20975","SPOILER DE PARE-CHOC AVANT REN"],["REPIRA20988","AILE AVD A PEINDRE"],["REPIRA20989","AILE AVANT GAUCHE A PEINDRE RE"],["REPIRA20990","CAPOT MOTEUR A PEINDRE RENAULT"],["REPIRA21002","PHARE AVANT DROIT H1/H7 NOIR C"],["REPIRA21003","PHARE AVANT GAUCHE H1/H7 NOIR"],["REPIRA21006","RETROVISEUR ELECTRIQUE DROIT A"],["REPIRA21007","RETROVISEUR ELECTRIQUE GAUCHE"],["REPIRA21391","SUPPORT GRILLE DE CALANDRE AV"],["REPIRA21392","AILE AVANT DROITE A PEINDRE RE"],["REPIRA21393","AILE AVANT GAUCHE A PEINDRE RE"],["REPIRA21396","PARE-BOUE D'AILE AVD PARTIE AV"],["REPIRA21397","PARE-BOUE D'AILE AVG PARTIE AV"],["REPIRA21409","PHARE AVANT DROIT H4 CHROME RE"],["REPIRA21417","RETROVISEUR MECANIQUE DROIT A"],["REPIRA21418","RETROVISEUR MECANIQUE GAUCHE A"],["REPIRA29427","PARE-BOUE D'AILE AVG PARTIE AR"],["REPIRA29428","PARE-BOUE D'AILE AVD PARTIE AV"],["REPIRA29429","PARE-BOUE D'AILE AVG PARTIE AV"],["REPIRA29435","PARE-CHOC AVANT A PEINDRE RENA"],["REPIRA29859","PARE-CHOC AVANT NOIR COMPLET R"],["REST16244","COURONNE  FIL 16244"],["REST17175","SACHET FUSIBLES 17175"],["REST17176","SACHET FUSIBLES 17176"],["REST17433","BOITE PRISE 17433"],["REST17493","BLISTER  INTERRUPTEUR 17493CR   A."],["REST17522","SACHET FUSIBLES 17522"],["REST225025","BLISTER CONNECTEURS 225025"],["REST306827","BOITE MAXI FUSIBLES 306827"],["REST306873","BOITE FUSIBLES 306873"],["REST306878","BOITE FUSIBLES 306878"],["REST306922","BOITE COSSES 306922"],["REST317021","BOITES BOUT A BOUT 317021"],["REST41010","PL BTE CABLE + PINCES 41010CR   A."],["REST41106","PL BTE COSSE A SOUDER 41106"],["REST4925","BTE 250 RIV.ALU B.4X16 4925"],["REST598","SACHET COLLIERS FAISCEAUX 598"],["REST6493","BLISTER RELAIS 6493"],["REST6841","SACHET FUSIBLES 6841"],["REST6844","SACHET FUSIBLES 6844"],["REST6847","SACHET FUSIBLES 6847"],["REST6875","SACHET FUSIBLES 6875"],["REST70201","COFFRET 70201 MINI FUSIBLES"],["ROMA08 7 013","CAOUTCHOUC MONTAGE"],["SASI5400002","FOURCHETTE EMBRAYAGE"],["SASI7774013","AXE DE BIELLE G/D"],["SEIMCS43","CONTACTEUR DE STOP"],["SID 82.1481","CAPT.TEMP.ECHAPP."],["SID.5839","ROTULE DE DIRECTION"],["SNR KA855.18","KIT D ACCESSOIRES"],["SNR KB655.40","KIT DE BUTEE DE SUSPENSION"],["SNR KB659.36","KIT DE BUTEE DE SUSPENSION"],["SOD 16254","CABLE MULTICONDUCTEUR GRIS STA"],["SOD 16946","CALE DE ROUE JAUNE AVEC INSERT"],["SOD 17011","GYROPHARE GOUTTE D'EAU - BLEU"],["SOD 18054","CALE ZINGUEE 6500KGS"],["SOD 79605","FEU ECLAIREUR DE PLAQUE UNIVER"],["SOREA1681","ALTERNATEUR VL / MERCEDESCR   E60."],["SORECONSIGNE 3","CONSIGNE SOREA"],["SPIL12148","GLCE RETRO D NIS.NV400 11/11-O"],["SPIL12555","GLCE RETRO G/D REN.KANGOO TYPE"],["SPIL490346","FEU AR G SPL 1P RENAULT VUL"],["SPIL490347","FEU AR D SPL 1P RENAULT VUL"],["SPIL52196","RETRO D NIS.NV400 11/11-OPEL"],["TAB BAT300","BATT.EFB L3 12V 70Ah 760A"],["TIP 2123770","MANOGONFLEUR EURODAINU VL TUYA"],["TIP 2124630","RALLONGE RIGIDE METAL COUDEE P"],["TIP 2129340","CONTROLEUR EURODAIRA STD POUR"],["TIP 3002190","RACCORDS M985 POUR TUYAU D. 8M"],["TIP 3002250","JOINTS DE RECHANGE POUR RACCOR"],["TIP 4004251","2 RACCORDS TUYAU D 7MM + JOINT"],["TIP 5121104","EMPLATRE RAD 110 TL"],["TIP 5121159","EMPLATRE RAD 115 TL"],["TIP 5121207","EMPLATRE RAD 120 TL"],["TIP 5159366","SPECIAL CEMENT BL SANS CFC (BI"],["TIP 5623080","VALVES M1840 TUBELESS AIR ET E"],["TIP 5631120","VALVE TR600HP L 43.8 MM"],["TIP 5632000","VALVES TR414 M756 STANDARD"],["TIP 5633000","VALVES TR414L M1878 STANDARD"],["TIP 5657100","100 MASSES JT 10G ZINC"],["TIP 5657150","100 MASSES JT 15G ZINC"],["TIP 5657200","100 MASSES JT 20G ZINC"],["TIP 5657250","100 MASSES JT 25G ZINC"],["TIP 5657300","100 MASSES JT 30G ZINC"],["TIP 5657350","50 MASSES JT 35G ZINC"],["TIP 5657400","50 MASSES JT 40G ZINC"],["TIP 5931854","PATE A PNEU POWERMOUNT (SEAU D"],["TIP 5931855","PATE A PNEU POWERMOUNT (SEAU D"],["TIP 5958401/1","CRAIES MARQUAGE BLANCHE"],["TIP 6000010","AEROSOL DEPANNAGE 300 ML"],["TRIS817510203","ETRIER DE FREINS NEUF"],["TRW DF4249S","DISQUE UNITAIRE"],["TRW DF4295","PAIRE DE DISQUES"],["TRW DF6110","PAIRE DE DISQUES"],["TRW DF6131S","DISQUE UNITAIRE"],["TRW DF6399","BTE DE 2 DISQ.(PRIX UNITAIRE)"],["TRW DF6419","BTE DE 2 DISQ.(PRIX UNITAIRE)"],["TRW DF6656","BTE DE 2 DISQ.(PRIX UNITAIRE)"],["TRW GDB1785","TRW JEU PLAQ.DE FREIN,FREIN"],["TRW GDB1786","TRW JEU PLAQ.DE FREIN,FREIN"],["TRW GDB1910","TRW JEU PLAQ.DE FREIN,FREIN"],["TRW GDB2157","TRW JEU PLAQ.DE FREIN,FREIN"],["TRW GDB3332","JEU DE PLAQUETTES"],["VALE044847","AB G/D RENAULT CLIO IV 07.2012"],["VALE088044","AB G FOGSTAR TGD CLIO II/LAGUN"],["VALE251687","COM. ECL TWINGO III/CAPTURE/CL"],["VALE368804","CAPT. TEMP-GAZ-ECHAP RENAULT C"],["VALE368858","CAPT. TEMP-GAZ-ECHAP RENAULT C"],["VALE432672","DEM-ORIGINS-RNLT-MEGA,LAGUN,ES"],["VALE436051","DEM-REGEN-RNLT-CLIO"],["VALE438360","DEM-ORIGINS-PEUGT-JUMP3,DUCATO"],["VALE479164","AVERTIS ELECTROMAGNET 24V 1,5ACR   PT."],["VALE479175","AVERTIS ELECTROMAGNET AM80S AI"],["VALE506902","PAE RENAULT ESPACE IV / NISSAN"],["VALE574107","SILENCIO V35 X1 YARIS 1   2, M"],["VALE700465","DOSEUR AIR RENAULT MASTERIII 2"],["VALE837162","FULLPACK DMF PSA C5 C4 PICASSO"],["VALE874897","CRC PEUGEOT 308 1.5 BLUEHDI 13"],["VALE884562","PULSEUR RENAULT KANGOO II"],["VALEC","CONSIGNE VALEO"],["VALEC VM","CONSIGNE VALEO VM"],["VERNOS3601","MANOCONTACT D HUILE / OIL SWIT"],["VOLTDP-L6D110","DEMARPRO 110AH"],["WALK86206","COLLIER CITROEN"]];
+
+/* Bandeau du papier à en-tête Barrault, extrait d'un devis SOUBAUTO. */
+var BANDEAU = 'data:image/png;base64,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';
+/* ===========================================================================
+   Suivi RAL — SDIS 33 / BARRAULT Le Haillan
+   Interface branchée sur Supabase.
+
+   Seule zone à modifier : le bloc CONFIG ci-dessous.
+   =========================================================================== */
+var CONFIG = {
+  url: 'https://czdrfqhuamifuzznpqcq.supabase.co',
+  cle: 'sb_publishable_fYMPaqdsK8hVW6FUXxIzNA_mhH3LvbW',
+  verrouMinutes: 15,      // au-delà, on redemande le code opérateur
+  rafraichirSecondes: 25  // les 5 postes voient les pointages des autres
+};
+
+(function () {
+'use strict';
+
+/* --------------------------------------------------------------------------
+   Accès à la base
+   -------------------------------------------------------------------------- */
+function api(chemin, opts) {
+  opts = opts || {};
+  return fetch(CONFIG.url + '/rest/v1/' + chemin, {
+    method: opts.method || 'GET',
+    headers: {
+      'apikey': CONFIG.cle,
+      'Authorization': 'Bearer ' + CONFIG.cle,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation'
+    },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  }).then(function (r) {
+    if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+    return r.status === 204 ? null : r.json();
+  });
+}
+
+var DATA = [], CODES = {}, sel = null, chargement = true, erreur = null;
+var filtre = 'all', q = '', fop = '', pilule = null, ouvSoldes = false, vue = 'bons';
+var brouillon = null;   // bon en cours de saisie manuelle
+var ajout = null;       // ligne en cours d'ajout sur un bon existant
+var glisse = null;      // index de la ligne en cours de deplacement
+var moi = null, enAttente = null, derniereAction = 0;
+var vueBon = 'lignes';  // 'lignes' | 'histo' — onglet du panneau de droite
+var HISTO = {};         // mouvements par bon, chargés à la demande
+
+/* --------------------------------------------------------------------------
+   Calculs — préparation et livraison sont deux choses différentes
+
+   Pointer une quantité au comptoir, c'est préparer : la pièce est là, elle
+   attend de partir. Elle n'est livrée qu'au moment où l'on imprime le bon
+   remis au client, et c'est seulement alors qu'elle sort du reste à livrer.
+
+   Trois quantités par ligne, et rien d'autre :
+     du   ce que le bon demande
+     exp  ce qui est préparé   (boutons + et −)
+     liv  ce qui est parti     (confirmé à l'impression)
+   -------------------------------------------------------------------------- */
+var VERT = 7, ORANGE = 14;
+function ralL(l) { return Math.max(0, l.du - l.liv); }          // encore dû
+function prepaL(l) { return Math.max(0, l.exp - l.liv); }       // prêt, pas parti
+function ralD(d) { return d.lignes.reduce(function (s, l) { return s + ralL(l); }, 0); }
+function prepaD(d) { return d.lignes.reduce(function (s, l) { return s + prepaL(l); }, 0); }
+function livD(d) { return d.lignes.reduce(function (s, l) { return s + l.liv; }, 0); }
+function solde(d) { return ralD(d) === 0; }
+function nivAge(a) { return a < VERT ? 'g' : (a <= ORANGE ? 'o' : 'r'); }
+
+/* L'état d'une ligne. La préparation passe devant : c'est l'action en cours,
+   celle qui appelle un geste. */
+function etatL(l) {
+  if (prepaL(l) > 0) return 'prepa';
+  if (ralL(l) === 0) return 'livre';
+  return l.liv > 0 ? 'partiel' : 'attente';
+}
+/* L'état d'un bon suit la même règle, puis l'ancienneté sert d'alerte sur ce
+   qui dort encore. */
+function statut(d) {
+  if (prepaD(d) > 0) return 'prepa';
+  if (solde(d)) return 'livre';
+  if (livD(d) > 0) return 'partiel';
+  var n = nivAge(d.age);
+  return n === 'r' ? 'late' : (n === 'o' ? 'warn' : 'attente');
+}
+var LIBELLES = {
+  prepa:   'En pr&eacute;paration',
+  livre:   'Livr&eacute;',
+  partiel: 'Livr&eacute; partiellement',
+  attente: 'En attente',
+  warn:    '&Agrave; surveiller',
+  late:    'En retard'
+};
+var CLASSES = {
+  prepa: 'b', livre: 'g', partiel: 'o', attente: 'n0', warn: 'o', late: 'r'
+};
+function libSt(s) { return LIBELLES[s] || s; }
+function clsSt(s) { return CLASSES[s] || 'n0'; }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+  });
+}
+function refHtml(r) {
+  var m = String(r).match(/^(.{4})(.*)$/);
+  return m ? esc(m[1]).replace(/ /g, '&nbsp;') + '<em>&middot;</em>' + esc(m[2]) : esc(r);
+}
+/* Teintes des pastilles d'opérateur. Elles tournent autour du bleu de
+   l'interface sans jamais l'être tout à fait : on doit distinguer cinq
+   collègues d'un coup d'œil, pas les confondre avec un élément actif. */
+var TEINTES = [205, 172, 262, 322, 32, 148, 226];
+function teinte(o) { var h = 0, i; for (i = 0; i < o.length; i++) h = (h * 31 + o.charCodeAt(i)) | 0;
+  return TEINTES[Math.abs(h) % TEINTES.length]; }
+function initiales(o) { var p = String(o).split(/\s+/);
+  return p.length > 1 ? (p[0][0] + p[1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase(); }
+function court(o) { var p = String(o).split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[1][0] + '.' : p[0]; }
+function avatar(o, cls) {
+  if (!o) return '';
+  // Sur fond sombre, une pastille peu saturée devient boueuse : on monte
+  // la saturation et la clarté pour qu'elle reste lisible en blanc.
+  return '<span class="av ' + (cls || 'sm') + '" style="background:hsl(' + teinte(o) + ' 58% 44%)">'
+    + esc(initiales(o)) + '</span>';
+}
+/* Un horodatage se lit mieux en date qu'en « il y a 2 j » : on sait tout de
+   suite si le pointage date d'avant ou d'après un événement connu. */
+function quand(t) {
+  if (!t) return '';
+  var d = new Date(t);
+  if (isNaN(d)) return '';
+  var p = function (n) { return ('0' + n).slice(-2); };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear()
+       + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/* --------------------------------------------------------------------------
+   Chargement depuis la base
+   -------------------------------------------------------------------------- */
+/* BL ou CMD — on lit ce que le document a déclaré, jamais une déduction.
+   Le code-barres tranche sans erreur possible : 15 chiffres pour un bon de
+   livraison (n° + dépôt + date), 9 pour une commande (n° + dépôt). L'import
+   écrit ce verdict dans la colonne « nature », et l'interface se contente de
+   le relire. Une saisie manuelle, elle, n'a pas de code-barres : l'opérateur
+   choisit lui-même, dans le formulaire.
+   Aucune règle sur la longueur du numéro : les séries de SOUBAUTO n'ont
+   jamais promis de garder leur forme, et une étiquette fausse sur un bon vaut
+   pire que pas d'étiquette du tout. */
+function natureBon(b) {
+  return b.nature === 'commande' ? 'CMD' : 'BL';
+}
+
+function charger(silencieux) {
+  if (!silencieux) { chargement = true; rendre(); }
+  return Promise.all([
+    api('v_bons?select=*&order=date_bon.desc'),
+    api('v_lignes?select=*&order=ordre.asc'),
+    Object.keys(CODES).length ? Promise.resolve(null) : api('operateurs?select=code,nom&actif=is.true')
+  ]).then(function (r) {
+    var bons = r[0], lignes = r[1];
+    if (r[2]) r[2].forEach(function (o) { CODES[o.code] = o.nom; });
+
+    var parBon = {};
+    lignes.forEach(function (l) { (parBon[l.bon_id] = parBon[l.bon_id] || []).push(l); });
+
+    DATA = bons.map(function (b) {
+      return {
+        id: b.id,
+        bon: (b.exercice ? b.exercice + '/' : '') + b.num_bon,
+        nat: natureBon(b),
+        num: b.num_bon,
+        vref: b.vreference || '—',
+        date: b.date_bon ? b.date_bon.split('-').reverse().join('/') : '',
+        heure: b.heure_bon || '',
+        cmde: b.num_commande || '—',
+        vrefOcr: b.vreference_ocr || '',
+        cmdeOcr: b.commande_ocr || '',
+        age: b.anciennete,
+        op: b.operateur || '—',
+        lignes: (parBon[b.id] || []).map(function (l) {
+          return {
+            id: l.id,
+            ordre: Number(l.ordre) || 0,
+            ref: l.reference,
+            des: l.designation || '',
+            du: Number(l.qte_due),
+            duOcr: l.qte_due_ocr == null ? null : Number(l.qte_due_ocr),
+            exp: Number(l.qte_expediee),        // préparé au comptoir
+            liv: Number(l.qte_livree) || 0,     // confirmé livré au client
+            op: l.modifie_par || b.operateur,
+            verif: !!l.a_verifier,
+            motif: l.motif || '',
+            ocr: l.reference_ocr || '',
+            verifiePar: l.verifie_par,
+            parQui: l.modifie_par,
+            quand: l.modifie_le
+          };
+        })
+      };
+    });
+    DATA.sort(function (a, b) { return a.age - b.age || String(b.num).localeCompare(a.num); });
+    if (!DATA.some(function (d) { return d.id === sel; })) {
+      sel = DATA.length ? DATA[0].id : null;
+      vueBon = 'lignes';
+    }
+    chargement = false; erreur = null; rendre();
+  }).catch(function (e) {
+    chargement = false;
+    erreur = humain(e);
+    rendre();
+  });
+}
+
+/* Un message d'erreur doit dire quoi faire, pas seulement que ça a raté. */
+function humain(e) {
+  var m = (e && e.message) || String(e);
+  if (/Failed to fetch|NetworkError|Load failed/i.test(m))
+    return 'Base injoignable. Vérifie ta connexion internet ; '
+         + 'si elle fonctionne, le projet Supabase est peut-être en veille.';
+  if (/JWT|apikey|Invalid API key|401|403/i.test(m))
+    return 'Clé d\'accès refusée par la base. Vérifie la clé dans la configuration de la page.';
+  if (/relation .* does not exist|42P01/i.test(m))
+    return 'Les tables sont absentes. Le script schema.sql n\'a pas encore été exécuté dans Supabase.';
+  if (/pas_plus_que_du/.test(m))
+    return 'Impossible d\'expédier plus que la quantité due.';
+  if (/une_reference_par_bon/.test(m))
+    return 'Cette référence figure déjà sur ce bon.';
+  return m;
+}
+
+/* Écriture d'une ligne. Affichage optimiste, retour arrière si la base refuse. */
+function ecrire(ligne, champs) {
+  var avant = { du: ligne.du, exp: ligne.exp, liv: ligne.liv };
+  // On ne peut pas avoir livré plus qu'on n'a préparé : ramener la préparation
+  // sous le livré corrige de fait une livraison déclarée à tort.
+  if (champs.qte_expediee !== undefined && champs.qte_expediee < ligne.liv) {
+    champs.qte_livree = champs.qte_expediee;
+  }
+  if (champs.qte_expediee !== undefined) ligne.exp = champs.qte_expediee;
+  if (champs.qte_livree !== undefined) ligne.liv = champs.qte_livree;
+  if (champs.qte_due !== undefined) ligne.du = champs.qte_due;
+  ligne.parQui = moi; ligne.quand = new Date().toISOString();
+  champs.modifie_par = moi;
+
+  return api('lignes?id=eq.' + encodeURIComponent(ligne.id),
+             { method: 'PATCH', body: champs, prefer: 'return=representation' })
+    .then(function (r) {
+      if (r && r[0] && isFinite(Number(r[0].qte_due)) && isFinite(Number(r[0].qte_expediee))) {
+        ligne.du = Number(r[0].qte_due);
+        ligne.exp = Number(r[0].qte_expediee);
+        ligne.liv = Number(r[0].qte_livree) || 0;
+        ligne.duOcr = r[0].qte_due_ocr == null ? null : Number(r[0].qte_due_ocr);
+      }
+      erreur = null;
+    })
+    .catch(function (e) {
+      ligne.du = avant.du; ligne.exp = avant.exp;   // on remet comme c'était
+      ligne.liv = avant.liv;
+      erreur = 'Modification non enregistrée. ' + humain(e);
+    })
+    .then(function () { rendre(); });
+}
+
+/* --------------------------------------------------------------------------
+   Identification de l'opérateur
+   -------------------------------------------------------------------------- */
+function majQui() {
+  var b = document.getElementById('who');
+  if (moi) {
+    b.innerHTML = '<span class="av" style="width:27px;height:27px;font-size:10.5px;background:hsl('
+      + teinte(moi) + ' 46% 37%)">' + esc(initiales(moi)) + '</span>';
+    b.title = "Changer d'opérateur";
+  } else {
+    b.innerHTML = '<span class="av anon" style="width:27px;height:27px;font-size:11px">?</span>'
+      + "<span>S'identifier</span>";
+    b.title = "S'identifier";
+  }
+}
+function demander(apres) {
+  enAttente = apres || null;
+  var ov = document.createElement('div'); ov.className = 'ov'; ov.id = 'ov';
+  ov.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shT">'
+    + '<h3 id="shT">Qui modifie&nbsp;?</h3><p>Saisis ton code op&eacute;rateur &agrave; 3 chiffres.</p>'
+    + '<input class="code" id="cd" inputmode="numeric" maxlength="3" autocomplete="off" '
+    + 'aria-label="Code op&eacute;rateur" placeholder="&bull;&bull;&bull;">'
+    + '<p class="err" id="er"></p>'
+    + '<div class="row"><button class="btn" id="cancel">Annuler</button></div></div>';
+  document.body.appendChild(ov);
+  var cd = document.getElementById('cd'); cd.focus();
+  cd.addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '');
+    document.getElementById('er').textContent = '';
+    if (this.value.length === 3) {
+      var n = CODES[this.value];
+      if (n) {
+        // On met de côté l'action en attente AVANT de fermer : fermer() remet
+        // enAttente à null, et l'action demandée était donc perdue — il fallait
+        // recliquer après s'être identifié.
+        var suite = enAttente;
+        moi = n; derniereAction = Date.now(); majQui(); fermer();
+        if (suite) suite();
+      } else {
+        document.getElementById('er').textContent = 'Code inconnu.';
+        this.classList.add('bad');
+        var i = this;
+        setTimeout(function () { i.classList.remove('bad'); i.value = ''; }, 430);
+      }
+    }
+  });
+  document.getElementById('cancel').addEventListener('click', fermer);
+  ov.addEventListener('click', function (e) { if (e.target === ov) fermer(); });
+  document.addEventListener('keydown', echap);
+}
+function echap(e) { if (e.key === 'Escape') fermer(); }
+function fermer() {
+  var o = document.getElementById('ov'); if (o) o.remove();
+  enAttente = null; document.removeEventListener('keydown', echap);
+}
+function agir(fn) {
+  if (!moi || Date.now() - derniereAction > CONFIG.verrouMinutes * 60000) { demander(fn); return; }
+  derniereAction = Date.now(); fn();
+}
+
+/* --------------------------------------------------------------------------
+   Animation FLIP
+   -------------------------------------------------------------------------- */
+function flip(racine, redessine) {
+  var red = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var avant = {};
+  if (!red) [].forEach.call(racine.querySelectorAll('[data-fk]'), function (el) {
+    avant[el.dataset.fk] = el.getBoundingClientRect().top;
+  });
+  redessine();
+  if (red) return;
+  [].forEach.call(racine.querySelectorAll('[data-fk]'), function (el) {
+    var a = avant[el.dataset.fk]; if (a == null) return;
+    var dy = a - el.getBoundingClientRect().top;
+    if (Math.abs(dy) < 1) return;
+    el.style.transition = 'none';
+    el.style.transform = 'translateY(' + dy + 'px)';
+    requestAnimationFrame(function () {
+      el.style.transition = 'transform .46s cubic-bezier(.22,1,.36,1)';
+      el.style.transform = '';
+      setTimeout(function () { el.style.transition = ''; }, 500);
+    });
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Filtrage
+   -------------------------------------------------------------------------- */
+function visibles() {
+  var t = q.trim().toUpperCase().replace(/\s+/g, '');
+  return DATA.filter(function (d) {
+    var s = statut(d);
+    if (pilule === 'late' && s !== 'late') return false;
+    if (pilule === 'ral' && solde(d)) return false;
+    if (!pilule) {
+      if (filtre === 'ral' && solde(d)) return false;
+      if (filtre === 'late' && s !== 'late') return false;
+    }
+    if (fop && d.op !== fop && !d.lignes.some(function (l) { return l.op === fop; })) return false;
+    if (!t) return true;
+    if (String(d.num).indexOf(t) >= 0 || String(d.vref).toUpperCase().indexOf(t) >= 0) return true;
+    return d.lignes.some(function (l) {
+      return l.ref.toUpperCase().replace(/\s+/g, '').indexOf(t) >= 0
+        || l.des.toUpperCase().indexOf(q.trim().toUpperCase()) >= 0;
+    });
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Rendu
+   -------------------------------------------------------------------------- */
+function rendrePilules() {
+  var late = 0, ral = 0;
+  DATA.forEach(function (d) {
+    if (statut(d) === 'late') late++;
+    d.lignes.forEach(function (l) { if (ralL(l) > 0) ral++; });
+  });
+  var av = 0;
+  DATA.forEach(function (d) { d.lignes.forEach(function (l) { if (l.verif) av++; }); });
+  document.querySelector('#pLate b').textContent = late;
+  document.querySelector('#pRal b').textContent = ral;
+  var pv = document.getElementById('pVerif');
+  pv.querySelector('b').textContent = av;
+  pv.hidden = av === 0 && vue !== 'verif';
+  document.getElementById('nouveau').setAttribute('aria-pressed', vue === 'saisie');
+  pv.setAttribute('aria-pressed', vue === 'verif');
+  document.getElementById('pLate').setAttribute('aria-pressed', pilule === 'late');
+  document.getElementById('pRal').setAttribute('aria-pressed', pilule === 'ral');
+}
+
+/* La jauge porte deux niveaux : le plein, c'est ce qui est parti ; le liseré
+   clair par-dessus, ce qui est prêt mais pas encore livré. On voit d'un coup
+   d'œil un bon dont la marchandise attend sur l'étagère. */
+function ligneBon(d) {
+  var s = statut(d);
+  var tot = d.lignes.reduce(function (a, l) { return a + l.du; }, 0);
+  var liv = livD(d), pre = prepaD(d);
+  var pLiv = tot ? Math.round(100 * liv / tot) : 100;
+  var pPre = tot ? Math.round(100 * Math.min(liv + pre, tot) / tot) : 100;
+  return '<button class="item s-' + s + '" data-id="' + d.id + '" data-fk="d' + d.id + '" '
+    + 'aria-current="' + (d.id === sel) + '">'
+    + '<span class="r1"><span class="nat">' + d.nat + '</span>'
+    + '<span class="bn">' + esc(d.num) + '</span>'
+    + '<span class="vr">' + esc(d.vref) + '</span></span>'
+    + '<span class="r2">' + avatar(d.op) + '<span>' + esc(d.date.slice(0, 5)) + '</span>'
+    + '<span class="bar"><u style="width:' + pPre + '%"></u>'
+      + '<i style="width:' + pLiv + '%"></i></span>'
+    + (s === 'livre' ? '<span class="bdg g">Livr&eacute;</span>'
+       : s === 'prepa' ? '<span class="bdg b">En pr&eacute;pa</span>'
+       : '<span class="bdg ' + nivAge(d.age) + '">J+' + d.age + '</span>')
+    + '</span></button>';
+}
+
+function rendreListe() {
+  var el = document.getElementById('lwrap');
+  if (chargement) { el.innerHTML = '<div class="empty">Chargement&hellip;</div>'; return; }
+  var v = visibles(), act = v.filter(function (d) { return !solde(d); }), sol = v.filter(solde), h = '';
+  if (!v.length) {
+    h = '<div class="empty">' + (DATA.length ? 'Aucun bon ne correspond.'
+      : 'Aucun bon dans la base.<br>Lance le script d\'import.') + '</div>';
+  } else {
+    if (act.length) {
+      h += '<div class="grp">En cours &middot; ' + act.length + '</div>';
+      act.forEach(function (d) { h += ligneBon(d); });
+    }
+    if (sol.length) {
+      h += '<button class="disc" id="disc" aria-expanded="' + ouvSoldes + '">'
+        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        + 'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>'
+        + 'Bons livr&eacute;s<span class="n">' + sol.length + '</span></button>'
+        + '<div id="solList"' + (ouvSoldes ? '' : ' hidden') + '>';
+      sol.forEach(function (d) { h += ligneBon(d); });
+      h += '</div>';
+    }
+  }
+  el.innerHTML = h;
+}
+
+function rendreDetail() {
+  var el = document.getElementById('detail');
+  if (chargement) { el.innerHTML = '<div class="empty">Chargement&hellip;</div>'; return; }
+  var d = DATA.filter(function (x) { return x.id === sel; })[0];
+  if (!d) { el.innerHTML = '<div class="empty">S&eacute;lectionne un bon dans la liste.</div>'; return; }
+  var s = statut(d), r = ralD(d), reste = d.lignes.some(function (l) { return ralL(l) > 0; });
+  var h = '<div class="dh"><div class="meta">'
+    + '<div class="kv big"><span>'
+      + (d.nat === 'CMD' ? 'Commande' : 'Bon de livraison') + '</span><b>'
+      + d.nat + '&nbsp;n&deg;&nbsp;' + esc(d.bon) + '</b></div>'
+    + '<div class="kv acc"><span>V/r&eacute;f&eacute;rence SDIS</span><b>'
+      + champEntete(d, 'vref') + '</b></div>'
+    + '<div class="kv"><span>N&deg; commande</span><b>'
+      + champEntete(d, 'cmde') + '</b></div>'
+    + '<div class="kv"><span>Date</span><b>' + esc(d.date) + '</b></div>'
+    + (s === 'livre' ? '' : '<div class="kv"><span>Anciennet&eacute;</span><b><span class="bdg '
+        + nivAge(d.age) + '">J+' + d.age + '</span></b></div>')
+    + '<div class="kv"><span>Op&eacute;rateur</span><b title="' + esc(d.op) + '">'
+      + avatar(d.op, 'md') + '</b></div>'
+    + '</div><div class="acts"><span class="bdg ' + clsSt(s) + '">' + libSt(s) + '</span>'
+    + '<button class="btn ic" id="histo" aria-pressed="' + (vueBon === 'histo')
+      + '" title="Historique des livraisons de ce bon">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+      + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'
+      + '<path d="M12 7v5l3.5 2"/></svg></button>'
+    + '<button class="btn" id="imprimer" title="Imprimer l\'&eacute;tat de ce bon '
+      + 'pour le client">Imprimer</button>'
+    + '<button class="btn pri" id="tout"' + (reste ? '' : ' disabled')
+      + '>Tout pr&eacute;parer</button>'
+    + '</div></div>';
+
+  if (vueBon === 'histo') { el.innerHTML = h + corpsHisto(d); return; }
+
+  h += '<div class="tw"><table><thead><tr><th class="tp"></th>'
+    + '<th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
+    + '<th class="n">Command&eacute;</th>'
+    + '<th style="text-align:center">Pr&eacute;par&eacute;</th>'
+    + '<th class="n">Livr&eacute;</th><th class="n">Reste</th>'
+    + '<th>&Eacute;tat</th></tr></thead><tbody>';
+  lignesOrdonnees(d).forEach(function (l, idx) {
+      var rl = ralL(l), pre = prepaL(l), e = etatL(l), fini = e === 'livre';
+      h += '<tr data-fk="l' + l.id + '" data-pos="' + idx + '" class="'
+        + (fini ? 'done' : '') + '">'
+        + '<td class="tp">'
+          + '<span class="poignee" draggable="true" data-drag="' + idx + '" '
+            + 'title="Glisser pour d&eacute;placer">&#8942;&#8942;</span>'
+          + '<button class="corb" data-supp="' + l.id + '" title="Supprimer cette ligne">'
+          + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+          + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+          + '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>'
+        + '</td>'
+        + '<td class="ref">' + refHtml(l.ref)
+          + (l.verif ? ' <span class="bdg b" title="' + esc(l.motif || 'lecture incertaine')
+              + '">&Agrave; v&eacute;rifier</span>' : '') + '</td>'
+        + '<td class="des">' + esc(l.des)
+          + (l.parQui ? '<span class="trace" title="' + esc(l.parQui) + '">'
+              + avatar(l.parQui) + quand(l.quand) + '</span>' : '')
+        + '</td>'
+        + '<td class="n"><button class="du' + (l.duOcr != null ? ' corr' : '') + '" data-du="' + l.id + '" '
+          + 'title="' + (l.duOcr != null ? 'Corrig&eacute; &agrave; la main (le scan indiquait ' + l.duOcr + ')'
+                                         : 'Corriger la quantit&eacute; due') + '">' + l.du + '</button></td>'
+        + '<td style="text-align:center"><span class="step">'
+          + '<button data-m="-1" data-l="' + l.id + '" aria-label="Retirer un"' + (l.exp <= 0 ? ' disabled' : '') + '>&minus;</button>'
+          + '<button class="v" data-exp="' + l.id + '" '
+            + 'title="Cliquer pour saisir la quantit&eacute;">' + l.exp + '</button>'
+          + '<button data-m="1" data-l="' + l.id + '" aria-label="Ajouter un"' + (l.exp >= l.du ? ' disabled' : '') + '>+</button>'
+          + (pre > 0 ? '<span class="pastille" title="' + pre + ' pi&egrave;ce'
+              + (pre > 1 ? 's' : '') + ' pr&ecirc;te' + (pre > 1 ? 's' : '')
+              + ', pas encore livr&eacute;e' + (pre > 1 ? 's' : '') + '">+' + pre + '</span>' : '')
+        + '</span></td>'
+        + '<td class="n liv' + (l.liv ? '' : ' z') + '">' + l.liv + '</td>'
+        + '<td class="n ral' + (fini ? ' z' : '') + '">' + rl + '</td>'
+        + '<td><span class="bdg ' + clsSt(e) + '">' + libSt(e) + '</span></td>'
+        + '</tr>';
+    });
+  if (ajout) {
+    h += '<tr class="ajl"><td class="tp"></td>'
+      + '<td><input class="si mono" id="a-ref" list="refs" autocomplete="off" '
+        + 'value="' + esc(ajout.ref) + '" placeholder="r&eacute;f&eacute;rence"></td>'
+      + '<td><input class="si" id="a-des" value="' + esc(ajout.des) + '" '
+        + 'placeholder="d&eacute;signation"></td>'
+      + '<td><input class="si n" id="a-du" value="' + esc(ajout.du) + '" '
+        + 'inputmode="numeric" placeholder="qt&eacute;"></td>'
+      + '<td colspan="4"><button class="btn pri" id="a-ok">Ajouter</button> '
+        + '<button class="btn" id="a-non">Annuler</button></td></tr>';
+  }
+  h += '</tbody></table></div>';
+  if (ajout && ajout.err) h += '<p class="serr" style="margin:0 24px">' + esc(ajout.err) + '</p>';
+  h += '<div class="tfoot">'
+    + '<button class="btn" id="addl">+ Ajouter une r&eacute;f&eacute;rence</button>'
+    + '<span class="tnote">Les lignes gardent l\'ordre du bon papier. '
+      + 'Glisse une ligne par sa poign&eacute;e pour le changer.</span>'
+    + '</div>';
+  var pre = prepaD(d), liv = livD(d);
+  h += '<div class="foot">'
+    + '<span class="cpt"><b>' + liv + '</b> livr&eacute;' + (liv > 1 ? 'es' : 'e') + '</span>'
+    + (pre > 0 ? '<span class="cpt pre"><b>' + pre + '</b> pr&ecirc;te'
+        + (pre > 1 ? 's' : '') + ' &agrave; partir</span>' : '')
+    + '<span class="cpt res"><b>' + r + '</b> restant &agrave; livrer</span>'
+    + (pre > 0 ? '<span class="tnote" style="flex-basis:100%">Imprimez le bon pour '
+        + 'confirmer la livraison de ce qui est pr&ecirc;t.</span>' : '')
+    + '</div>';
+  el.innerHTML = h;
+}
+
+/* --------------------------------------------------------------------------
+   Correction de la V/référence et du n° de commande
+
+   Le n° de bon, le client, le dépôt et la date viennent du code-barres : ils
+   sont sûrs. Ces deux champs-là sont lus à l'œil sur la page, sans filet —
+   et la V/référence est précisément le numéro que le SDIS utilise pour nous
+   relancer. Il fallait pouvoir la corriger sans passer par la base.
+   -------------------------------------------------------------------------- */
+var ENTETE = {
+  vref: {
+    col: 'vreference', lib: 'V/r&eacute;f&eacute;rence SDIS', ph: 'T3262755',
+    /* Format maison : T suivi de 7 chiffres. On normalise ce qui y ressemble
+       et on laisse passer le reste tel quel — l'opérateur a le papier. */
+    nettoie: function (v) {
+      v = v.replace(/\s+/g, '').toUpperCase();
+      return /^T?\d+$/.test(v) ? 'T' + v.replace(/\D/g, '') : v;
+    }
+  },
+  cmde: {
+    col: 'num_commande', lib: 'N&deg; commande', ph: '0046259',
+    nettoie: function (v) {
+      v = v.replace(/\s+/g, '');
+      if (!/^\d+$/.test(v)) return v;
+      while (v.length < 7) v = '0' + v;
+      return v;
+    }
+  }
+};
+
+function champEntete(d, quoi) {
+  var c = ENTETE[quoi], lu = quoi === 'vref' ? d.vrefOcr : d.cmdeOcr;
+  return '<button class="ed' + (lu ? ' corr' : '') + '" data-ent="' + quoi + '" title="'
+    + (lu ? 'Corrig&eacute; &agrave; la main (le scan indiquait ' + esc(lu) + ')'
+          : 'Cliquer pour corriger')
+    + '">' + esc(d[quoi]) + '</button>';
+}
+
+function editerEntete(d, quoi, cible) {
+  var c = ENTETE[quoi];
+  if (!c || document.querySelector('.entin')) return;
+  var avant = d[quoi] === '—' ? '' : d[quoi];
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'entin'; inp.value = avant;
+  inp.setAttribute('placeholder', c.ph);
+  inp.setAttribute('aria-label', c.lib.replace(/&[a-z]+;/g, ''));
+  cible.replaceWith(inp); inp.focus(); inp.select();
+
+  var fini = false;
+  function valider(ok) {
+    if (fini) return; fini = true;
+    var v = c.nettoie(inp.value);
+    if (!ok || v === avant) { rendre(); return; }
+    var champs = {}; champs[c.col] = v || null;
+    champs.corrige_par = moi;
+    d[quoi] = v || '—';
+    rendre();
+    api('bons?id=eq.' + encodeURIComponent(d.id),
+        { method: 'PATCH', body: champs, prefer: 'return=representation' })
+      .then(function (r) {
+        if (r && r[0]) {
+          d.vrefOcr = r[0].vreference_ocr || '';
+          d.cmdeOcr = r[0].commande_ocr || '';
+        }
+        erreur = null;
+      })
+      .catch(function (e) {
+        d[quoi] = avant || '—';
+        erreur = 'Correction non enregistr&eacute;e. ' + humain(e);
+      })
+      .then(rendre);
+  }
+  inp.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') valider(true);
+    if (ev.key === 'Escape') valider(false);
+  });
+  inp.addEventListener('blur', function () { valider(true); });
+}
+
+/* --------------------------------------------------------------------------
+   Historique des livraisons d'un bon
+
+   Seuls les mouvements de quantité expédiée y figurent : c'est le fil de la
+   livraison, pas le journal technique. Les corrections de référence ou de
+   quantité due sont tracées en base, mais elles ne racontent pas au client ni
+   au comptoir ce qui est parti et quand.
+
+   Chargé à la demande, une fois par bon : l'historique n'intéresse que celui
+   qui l'ouvre, inutile de le tirer pour tous les bons à chaque rafraîchissement.
+   -------------------------------------------------------------------------- */
+function chargerHisto(d) {
+  HISTO[d.id] = { etat: 'charge' };
+  api('v_mouvements?select=*&bon_id=eq.' + encodeURIComponent(d.id)
+      + '&champ=eq.qte_livree&order=au.desc')
+    .then(function (r) {
+      HISTO[d.id] = { etat: 'ok', lignes: r || [] };
+    })
+    .catch(function (e) {
+      HISTO[d.id] = { etat: 'erreur', msg: humain(e) };
+    })
+    .then(function () { if (vueBon === 'histo' && sel === d.id) rendreDetail(); });
+}
+
+function corpsHisto(d) {
+  var h = HISTO[d.id];
+  if (!h) { chargerHisto(d); return '<div class="empty">Chargement de l\'historique&hellip;</div>'; }
+  if (h.etat === 'charge') return '<div class="empty">Chargement de l\'historique&hellip;</div>';
+  if (h.etat === 'erreur') {
+    return '<div class="empty">Historique indisponible.<br>' + esc(h.msg) + '</div>';
+  }
+  if (!h.lignes.length) {
+    return '<div class="empty">Aucune livraison enregistr&eacute;e sur ce bon.<br>'
+      + 'Chaque pointage de quantit&eacute; exp&eacute;di&eacute;e viendra s\'inscrire ici.</div>';
+  }
+
+  /* Les mouvements d'une même journée sont regroupés : c'est ainsi qu'on s'en
+     souvient — « la livraison de mardi », pas « le mouvement de 14 h 32 ». */
+  var jours = [], parJour = {};
+  h.lignes.forEach(function (m) {
+    var j = jourDe(m.au);
+    if (!parJour[j]) { parJour[j] = []; jours.push(j); }
+    parJour[j].push(m);
+  });
+
+  var out = '<div class="histo">';
+  jours.forEach(function (j) {
+    var lot = parJour[j], total = 0;
+    lot.forEach(function (m) { total += Math.max(0, Number(m.apres) - Number(m.avant)); });
+    out += '<div class="hj"><span class="hjd">' + esc(j) + '</span>'
+      + '<span class="hjn">' + lot.length + ' mouvement' + (lot.length > 1 ? 's' : '')
+      + (total > 0 ? ' &middot; ' + total + ' pi&egrave;ce' + (total > 1 ? 's' : '') : '')
+      + '</span></div>';
+    lot.forEach(function (m) {
+      var av = Number(m.avant) || 0, ap = Number(m.apres) || 0, delta = ap - av;
+      out += '<div class="hm">'
+        + '<span class="hh">' + esc(heureDe(m.au)) + '</span>'
+        + '<span class="hr">' + refHtml(m.reference) + '</span>'
+        + '<span class="hd">' + esc(m.designation || '') + '</span>'
+        + '<span class="hq">' + av + '<i>&rarr;</i>' + ap + '</span>'
+        + '<span class="hv ' + (delta >= 0 ? 'p' : 'n') + '">'
+          + (delta >= 0 ? '+' : '&minus;') + Math.abs(delta) + '</span>'
+        + '<span class="ho" title="' + esc(m.operateur || '') + '">'
+          + avatar(m.operateur || '—') + '</span>'
+        + '</div>';
+    });
+  });
+  return out + '</div>';
+}
+
+function jourDe(t) {
+  var d = new Date(t);
+  if (isNaN(d)) return '';
+  var p = function (n) { return ('0' + n).slice(-2); };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+function heureDe(t) {
+  var d = new Date(t);
+  if (isNaN(d)) return '';
+  var p = function (n) { return ('0' + n).slice(-2); };
+  return p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+function rendreErreur() {
+  var b = document.getElementById('bandeau');
+  if (erreur) { b.textContent = erreur; b.hidden = false; }
+  else b.hidden = true;
+}
+
+function rendreCentre() {
+  if (vue === 'saisie') rendreSaisie();
+  else if (vue === 'verif') rendreVerif();
+  else rendreDetail();
+}
+function rendre() { rendrePilules(); rendreListe(); rendreCentre(); rendreErreur(); }
+
+
+/* --------------------------------------------------------------------------
+   Feuilles imprimables remises au client
+
+   Le chauffeur repart avec une feuille par bon : le client voit d'un coup
+   d'œil ce qu'il a reçu et ce qu'on lui doit encore, sans avoir à recouper
+   ses propres bons. Le récapitulatif, lui, se sort à la demande — c'est la
+   même information, vue de l'autre bout : tout ce qui reste dû, tous bons
+   confondus.
+
+   Rien n'est envoyé nulle part : on remplit un bloc caché de la page et on
+   laisse le navigateur imprimer. Pas de fenêtre surgissante à débloquer sur
+   les postes du comptoir.
+   -------------------------------------------------------------------------- */
+function maintenant() {
+  var d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear()
+       + ' &agrave; ' + p(d.getHours()) + 'h' + p(d.getMinutes());
+}
+
+function pEnTete(titre, meta) {
+  return '<div class="ph"><div><div class="pmarq">BARRAULT &mdash; Le Haillan</div>'
+    + '<div class="psub">Client : SDIS 33</div></div>'
+    + '<div class="ptit">' + titre + '</div></div>'
+    + (meta ? '<div class="pmeta">' + meta + '</div>' : '');
+}
+function pMeta(lib, val) {
+  return '<div><span>' + lib + '</span> <b>' + esc(val) + '</b></div>';
+}
+function pPied() {
+  return '<p class="pfoot">Document d\'information &eacute;dit&eacute; le ' + maintenant()
+    + '. &Eacute;tat des livraisons &agrave; cette date.</p>';
+}
+
+/* ===========================================================================
+   Le bon de livraison, calqué sur le devis SOUBAUTO
+
+   Les positions ci-dessous ne sont pas décoratives : elles sont relevées au
+   point près sur un devis Barrault (bandeau à 4pt, cadre client à 298pt,
+   titre à 243,7pt, grille de colonnes à 302,8pt, gris #EBEBEB, cases
+   séparées par 1,8pt de blanc). Le client reçoit donc un document qui a
+   exactement la tête de ceux qu'il reçoit déjà.
+
+   Ce qui change par rapport au devis : plus de prix ni de totaux TVA, et
+   deux colonnes à la place — quantité livrée et reste à livrer.
+   =========================================================================== */
+
+/* Coordonnées de l'entreprise, relevées sur le papier à en-tête. */
+var SITE = {
+  ville: 'LE HAILLAN',
+  adresse: ['1 AVENUE DE MAGUDAS', 'LE PARC DE MAGUDAS', '33185&nbsp; LE HAILLAN',
+            'SIRET : 025 480 401 00634'],
+  tel: 'T&eacute;l. : 05 57 54 46 96',
+  mail: 'commandelehaillan@barrault.com',
+  mail2: 'bordeaux@barrault.com',
+  legal1: 'S.A.S. BARRAULT au capital de 1 584 100 &euro; - N&deg; TVA FR74 025 480 401- '
+        + 'RC Niort 025 480 401 00097 - APE 4531Z',
+  legal2: 'Si&egrave;ge social :   Rue de la Grange Verrines   79000 NIORT - '
+        + 'T&eacute;l&eacute;phone : 05 49 28 38 22 - Mail : contact@barrault.com',
+  depot: 'HAILLAN   (SUC)'
+};
+
+/* Bloc destinataire. Les quatre lignes reprennent les quatre niveaux du
+   devis : raison sociale, voie, code postal + ville, pays. Laisser une
+   ligne vide la fait simplement disparaître. */
+var CLIENT = {
+  code: '30258',
+  nom: 'SDIS 33',
+  voie: '22 BOULEVARD PIERRE 1ER',
+  ville: '33081 BORDEAUX',
+  pays: 'FRANCE'
+};
+
+/* --- code-barres Code39, comme sur les bons SOUBAUTO ---------------------- */
+var C39 = { '0':'nnnwwnwnn', '1':'wnnwnnnnw', '2':'nnwwnnnnw', '3':'wnwwnnnnn',
+            '4':'nnnwwnnnw', '5':'wnnwwnnnn', '6':'nnwwwnnnn', '7':'nnnwnnwnw',
+            '8':'wnnwnnwnn', '9':'nnwwnnwnn', '*':'nwnnwnwnn' };
+
+function codeBarres(txt) {
+  var s = '*' + String(txt).replace(/\D/g, '') + '*', mods = [], i, j;
+  mods.push([false, 10]);                  // marge blanche exigée par les lecteurs
+  for (i = 0; i < s.length; i++) {
+    var m = C39[s.charAt(i)];
+    if (!m) continue;
+    for (j = 0; j < 9; j++) mods.push([j % 2 === 0, m.charAt(j) === 'w' ? 3 : 1]);
+    mods.push([false, 1]);                 // séparateur inter-caractère
+  }
+  mods[mods.length - 1] = [false, 10];
+  var total = 0;
+  mods.forEach(function (m) { total += m[1]; });
+  var x = 0, r = '';
+  mods.forEach(function (m) {
+    if (m[0]) r += '<rect x="' + x.toFixed(2) + '" y="0" width="' + m[1]
+                 + '" height="10" fill="#000"/>';
+    x += m[1];
+  });
+  return '<svg class="cb" viewBox="0 0 ' + total + ' 10" preserveAspectRatio="none">'
+       + r + '</svg>';
+}
+
+/* Le code composite des bons SOUBAUTO : n° de bon + dépôt + date AAMMJJ. */
+function codeCompose(d) {
+  var p = String(d.date || '').split('/');
+  var jour = p.length === 3 ? p[2].slice(2) + p[1] + p[0] : '';
+  return String(d.num || '').replace(/\D/g, '') + '33' + jour;
+}
+
+/* --- briques de mise en page ---------------------------------------------- */
+function blT(x, y, style, txt) {
+  return '<div class="t" style="left:' + x + 'pt;top:' + y + 'pt;' + style + '">'
+       + txt + '</div>';
+}
+function blCase(x, w, lib, val, taille) {
+  return '<div class="ic" style="left:' + x + 'pt;width:' + w + 'pt">' + lib + '</div>'
+       + '<div class="iv" style="left:' + x + 'pt;width:' + w + 'pt;font-size:'
+       + (taille || 12) + 'pt">' + val + '</div>';
+}
+
+/* Une ligne du bon imprimé. La quantité affichée dépend de la section où
+   elle figure — c'est le titre de la section qui lui donne son sens, et la
+   colonne « Qt cmd » permet de recouper : livré ce jour + déjà livré + reste
+   = quantité commandée. */
+function blLigne(l, qte) {
+  return '<tr><td class="rf">' + esc(l.ref) + '</td><td>' + esc(l.des) + '</td>'
+    + '<td class="q">' + l.du + '</td>'
+    + '<td class="q">' + qte + '</td></tr>';
+}
+function blZone(titre, suite) {
+  return '<tr class="zn"><td colspan="4">' + titre
+       + (suite ? ' <i>(suite)</i>' : '') + '</td></tr>';
+}
+
+/* Une respiration entre deux sections. Collées, les trois barres grises se
+   lisaient comme un seul bloc et l'œil devait relire les titres pour savoir
+   où il en était. Ce n'est pas une ligne de contenu : elle ne s'imprime
+   jamais en tête de page, seulement entre deux sections. */
+function blEspace() {
+  return '<tr class="esp"><td colspan="4"></td></tr>';
+}
+
+/* Le cadre à faire tamponner. Il ne figure que sur la DERNIÈRE page : c'est
+   la feuille que le livreur présente, et un tampon par page n'a pas de sens.
+   Placé en bas à droite, sous le tableau — la zone reste libre quelle que
+   soit la longueur du bon, les lignes s'arrêtant à 590pt. */
+function blTampon() {
+  return '<div class="tmp">'
+    + '<div class="tt">TAMPON ET SIGNATURE DU CLIENT</div>'
+    + '</div>';
+}
+
+/* Date ET heure du bandeau sont celles de l'impression, pas celles du bon :
+   les trois cases Date, Heure et Opérateur décrivent le même événement —
+   qui a sorti cette feuille, et quand. La date du bon, elle, reste portée
+   par son numéro et par le code-barres.
+
+   Calculées une seule fois pour tout le document, sinon la minute pourrait
+   changer entre la page 1 et la page 2. */
+function instantImpression() {
+  var d = new Date(), p = function (n) { return ('0' + n).slice(-2); };
+  return {
+    date: p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear(),
+    heure: p(d.getHours()) + ':' + p(d.getMinutes())
+  };
+}
+
+/* En-tête complet d'une page : il est réimprimé à l'identique sur chaque
+   feuille, comme le fait SOUBAUTO quand un bon déborde. */
+function blEntete(d, page, total, t) {
+  return '<div class="hz">'
+    + '<img class="ban" src="' + BANDEAU + '" alt="">'
+    + blT(139, 4.5, 'font-size:14pt;font-weight:bold', SITE.ville)
+    + blT(478, 4.7, 'font-size:12pt;font-weight:bold', SITE.tel)
+    + blT(394, 20.7, 'font-size:12pt;font-weight:bold', SITE.mail)
+    + blT(482, 40, 'font-size:10pt', SITE.mail2)
+    + blT(139, 21.4, 'font-size:8.6pt', SITE.adresse[0])
+    + blT(139, 31.4, 'font-size:8.6pt', SITE.adresse[1])
+    + blT(139, 50.4, 'font-size:8.6pt', SITE.adresse[2])
+    + blT(139, 60.4, 'font-size:8.6pt', SITE.adresse[3])
+    + blT(139, 79.4, 'font-size:8.6pt', SITE.legal1)
+    + blT(139, 88.4, 'font-size:8.6pt', SITE.legal2)
+    + blT(298, 147.7, 'font-size:12pt;font-weight:bold', esc(CLIENT.nom))
+    + (CLIENT.voie ? blT(298, 171.7, 'font-size:12pt', esc(CLIENT.voie)) : '')
+    + (CLIENT.ville ? blT(298, 195.7, 'font-size:12pt', esc(CLIENT.ville)) : '')
+    + (CLIENT.pays ? blT(298, 207.7, 'font-size:12pt', esc(CLIENT.pays)) : '')
+    + blT(18, 243.7, 'font-size:12pt;font-weight:bold',
+          'BON DE LIVRAISON N&ordm;  ' + esc(d.bon))
+    + '<div class="cbz">' + codeBarres(codeCompose(d)) + '</div>'
+    + blCase(17, 88, 'Date', t.date)
+    + blCase(106.8, 58.2, 'Heure', t.heure)
+    + blCase(166.8, 98.2, 'Client', esc(CLIENT.code))
+    + blCase(266.8, 133.2, 'Op&eacute;rateur', esc(moi || d.op), 8)
+    + blCase(401.8, 118.2, 'D&eacute;p&ocirc;t', SITE.depot, 8)
+    + blCase(521.8, 64, 'Page', total > 1 ? page + '/' + total : String(page))
+    + '</div>';
+}
+
+/* Hauteurs en points, mesurées sur le rendu : elles servent uniquement à
+   décider où couper. Le plafond est celui du devis — les lignes s'arrêtent
+   avant le pavé de totaux. */
+var H_RAPPEL = 16.6, H_ZONE = 17.4, H_LIGNE = 14.4, H_ESPACE = 9,
+    H_UTILE = 590 - 317.1;
+
+/* Trois sections, et jamais de mélange entre elles :
+     ce qui part aujourd'hui, ce qui était déjà parti, ce qui reste dû.
+   Une même référence peut figurer dans plusieurs sections avec des quantités
+   différentes — c'est précisément ce qui rend le document lisible.
+
+   Le document se construit AVANT l'écriture en base : à ce moment `liv` est
+   encore la livraison d'avant, et `exp - liv` ce qui part maintenant. */
+function feuilleBon(d) {
+  var toutes = lignesOrdonnees(d);
+  var ceJour = [], deja = [], reste = [];
+  toutes.forEach(function (l) {
+    var n = prepaL(l);                       // part avec cette impression
+    if (n > 0) ceJour.push({ l: l, q: n });
+    if (l.liv > 0) deja.push({ l: l, q: l.liv });
+    var r = Math.max(0, l.du - l.exp);       // ce qui restera dû après
+    if (r > 0) reste.push({ l: l, q: r });
+  });
+
+  var suite = [], premiere = true;
+  function section(titre, lot) {
+    if (!lot.length) return;                 // une section vide ne s'imprime pas
+    if (!premiere) suite.push({ h: H_ESPACE, html: blEspace(), espace: true });
+    premiere = false;
+    suite.push({ h: H_ZONE, zone: titre });
+    lot.forEach(function (x) {
+      suite.push({ h: H_LIGNE, html: blLigne(x.l, x.q) });
+    });
+  }
+  section('R&Eacute;F&Eacute;RENCES LIVR&Eacute;ES PAR CE BON', ceJour);
+  section('R&Eacute;F&Eacute;RENCES D&Eacute;J&Agrave; LIVR&Eacute;ES', deja);
+  section('R&Eacute;F&Eacute;RENCES RESTANT &Agrave; LIVRER', reste);
+
+  if (!suite.length) {
+    suite.push({ h: H_LIGNE,
+                 html: '<tr><td></td><td colspan="3">Aucune ligne sur ce bon.</td></tr>' });
+  }
+
+  var rappel = '<tr class="ref"><td></td><td colspan="3">V/r&eacute;f&eacute;rence <b>'
+      + esc(d.vref) + '</b></td></tr>'
+    + '<tr class="ref"><td></td><td colspan="3">N&deg; commande <b>'
+      + esc(d.cmde) + '</b></td></tr>';
+
+  var pages = [], cour = [], reste = H_UTILE - 2 * H_RAPPEL, zone = null;
+  suite.forEach(function (r) {
+    // Une barre de zone seule en bas de page ne sert à rien : on la reporte.
+    // Un espaceur, lui, se contente de disparaître s'il tombe sur la coupure :
+    // un blanc en haut de page n'aère rien, il décale.
+    var besoin = r.zone ? r.h + H_LIGNE : r.h;
+    if (besoin > reste && cour.length) {
+      pages.push(cour); cour = []; reste = H_UTILE - 2 * H_RAPPEL;
+      if (r.espace) return;
+      if (!r.zone && zone) { cour.push(blZone(zone, true)); reste -= H_ZONE; }
+    }
+    if (r.zone) { zone = r.zone; cour.push(blZone(r.zone, false)); }
+    else cour.push(r.html);
+    reste -= r.h;
+  });
+  pages.push(cour);
+
+  var h = '', t = instantImpression();
+  pages.forEach(function (lignes, i) {
+    var dernier = i === pages.length - 1;
+    h += '<div class="pf bl">' + blEntete(d, i + 1, pages.length, t)
+      + '<table class="ln"><thead><tr>'
+      + '<th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th><th>Qt cmd</th>'
+      + '<th>Quantit&eacute;</th>'
+      + '</tr></thead><tbody>' + rappel + lignes.join('') + '</tbody></table>';
+    if (dernier) {
+      h += blTampon()
+        + '<div class="edite">&Eacute;tat des livraisons au ' + maintenant() + '.</div>';
+    } else {
+      h += '<div class="edite">Suite page ' + (i + 2) + '.</div>';
+    }
+    h += '</div>';
+  });
+  return h;
+}
+
+/* Le récapitulatif : uniquement ce qui reste dû, le plus ancien en tête. */
+function feuilleRecap() {
+  var ouverts = DATA.filter(function (d) { return ralD(d) > 0; })
+                    .sort(function (a, b) { return b.age - a.age; });
+  var total = ouverts.reduce(function (s, d) { return s + ralD(d); }, 0);
+  var h = '<div class="pf rec">' + pEnTete('Articles en attente de livraison',
+      pMeta('Bons concern&eacute;s', String(ouverts.length))
+      + pMeta('Pi&egrave;ces en attente', String(total)));
+  if (!ouverts.length) {
+    h += '<p class="ptot">Aucun article en attente : tous les bons sont livr&eacute;s.</p>';
+  } else {
+    ouverts.forEach(function (d) {
+      h += '<div class="pbloc"><div class="pbt">Bon ' + esc(d.bon)
+        + '<span>V/r&eacute;f. ' + esc(d.vref) + ' &middot; du ' + esc(d.date)
+        + ' &middot; en attente depuis ' + d.age + ' jour' + (d.age > 1 ? 's' : '')
+        + '</span></div>'
+        + '<table><thead><tr><th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
+        + '<th class="n">Command&eacute;</th><th class="n">Livr&eacute;</th>'
+        + '<th class="n">Reste</th></tr></thead><tbody>';
+      lignesOrdonnees(d).forEach(function (l) {
+        var rl = ralL(l);
+        if (rl <= 0) return;
+        h += '<tr class="reste"><td class="mono">' + esc(l.ref) + '</td>'
+          + '<td class="d">' + esc(l.des) + '</td>'
+          + '<td class="n">' + l.du + '</td><td class="n">' + l.exp + '</td>'
+          + '<td class="n">' + rl + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    });
+    h += '<p class="ptot"><b>' + total + '</b> pi&egrave;ce' + (total > 1 ? 's' : '')
+      + ' en attente, r&eacute;parti' + (total > 1 ? 'es' : 'e') + ' sur '
+      + ouverts.length + ' bon' + (ouverts.length > 1 ? 's' : '') + '.</p>';
+  }
+  return h + pPied() + '</div>';
+}
+
+/* ---------------------------------------------------------------------------
+   Confirmation de livraison
+
+   C'est le pivot du nouveau fonctionnement : tant qu'on n'a pas imprimé, la
+   marchandise est préparée, pas livrée. L'impression est donc l'acte qui fait
+   basculer les quantités — et un acte qui engage se confirme.
+
+   L'ordre compte : on fabrique la feuille AVANT d'écrire (elle a besoin de
+   savoir ce qui était déjà livré), on écrit, et on n'imprime que si l'écriture
+   a réussi. Sortir un papier que la base ne confirme pas serait le pire des
+   deux mondes.
+   --------------------------------------------------------------------------- */
+function lancerImpression(d) {
+  var aLivrer = d.lignes.filter(function (l) { return prepaL(l) > 0; });
+  if (!aLivrer.length) { imprimer(feuilleBon(d)); return; }   // simple réimpression
+  confirmerLivraison(d, aLivrer);
+}
+
+function confirmerLivraison(d, aLivrer) {
+  var total = aLivrer.reduce(function (s, l) { return s + prepaL(l); }, 0);
+  var ov = document.createElement('div');
+  ov.className = 'ov'; ov.id = 'ov';
+  var liste = lignesOrdonnees(d).filter(function (l) { return prepaL(l) > 0; })
+    .map(function (l) {
+      return '<div class="cl"><span class="clr">' + refHtml(l.ref) + '</span>'
+        + '<span class="cld">' + esc(l.des) + '</span>'
+        + '<span class="clq">' + prepaL(l) + '</span></div>';
+    }).join('');
+  ov.innerHTML = '<div class="sheet large" role="dialog" aria-modal="true" '
+    + 'aria-labelledby="cfT">'
+    + '<h3 id="cfT">Confirmer la livraison&nbsp;?</h3>'
+    + '<p>Ces pi&egrave;ces vont &ecirc;tre d&eacute;clar&eacute;es livr&eacute;es au SDIS 33, '
+    + 'puis le bon sera imprim&eacute;.</p>'
+    + '<div class="clist">' + liste + '</div>'
+    + '<p class="cltot"><b>' + total + '</b> pi&egrave;ce' + (total > 1 ? 's' : '')
+    + ' sur <b>' + aLivrer.length + '</b> r&eacute;f&eacute;rence'
+    + (aLivrer.length > 1 ? 's' : '') + '</p>'
+    + '<p class="err" id="cfEr"></p>'
+    + '<div class="row"><button class="btn" id="cfNon">Annuler</button>'
+    + '<button class="btn pri" id="cfOui">Confirmer et imprimer</button></div></div>';
+  document.body.appendChild(ov);
+  document.getElementById('cfOui').focus();
+
+  document.getElementById('cfNon').addEventListener('click', fermer);
+  ov.addEventListener('click', function (e) { if (e.target === ov) fermer(); });
+  document.addEventListener('keydown', echap);
+
+  document.getElementById('cfOui').addEventListener('click', function () {
+    var bouton = this;
+    bouton.disabled = true; bouton.textContent = 'Enregistrement\u2026';
+    var feuille = feuilleBon(d);                 // avant l'écriture, impérativement
+    Promise.all(aLivrer.map(function (l) {
+      return api('lignes?id=eq.' + encodeURIComponent(l.id), {
+        method: 'PATCH', prefer: 'return=representation',
+        body: { qte_livree: l.exp, modifie_par: moi }
+      }).then(function (r) {
+        if (r && r[0]) l.liv = Number(r[0].qte_livree) || 0;
+      });
+    })).then(function () {
+      HISTO[d.id] = null;                        // l'historique vient de changer
+      fermer();
+      imprimer(feuille);
+      rendre();
+    }).catch(function (e) {
+      bouton.disabled = false; bouton.textContent = 'Confirmer et imprimer';
+      document.getElementById('cfEr').innerHTML =
+        'Livraison non enregistr&eacute;e, rien n\'a &eacute;t&eacute; imprim&eacute;. '
+        + humain(e);
+    });
+  });
+}
+
+function imprimer(html) {
+  var z = document.getElementById('print');
+  if (!z) return;
+  z.innerHTML = html;
+  // Laisser au navigateur le temps de poser la mise en page avant d'ouvrir
+  // l'aperçu, sinon Chrome imprime parfois une page vide.
+  setTimeout(function () { window.print(); }, 60);
+}
+
+
+
+
+/* --------------------------------------------------------------------------
+   Lignes d'un bon : ordre d'affichage, ajout, suppression, classement manuel
+   -------------------------------------------------------------------------- */
+
+/* Les lignes gardent l'ordre du papier, ou celui fixé à la main.
+
+   Elles ne sont PLUS retriées par statut : une ligne qui remonte au moment
+   où on la solde déplace toutes les suivantes, et le clic destiné au « + »
+   d'une ligne atterrit sur celui d'une autre. Sur une quantité de 5 saisie
+   au clic, l'erreur est quasi certaine. */
+function lignesOrdonnees(d) {
+  return d.lignes.slice().sort(function (a, b) { return a.ordre - b.ordre; });
+}
+
+function supprimerLigne(d, lid) {
+  var l = d.lignes.filter(function (x) { return x.id === lid; })[0];
+  if (!l) return;
+  if (!window.confirm('Supprimer la ligne ' + l.ref + ' — ' + l.des + ' ?\n\n'
+      + 'Elle disparaîtra définitivement de ce bon.')) return;
+  var pos = d.lignes.indexOf(l);
+  d.lignes.splice(pos, 1);
+  rendrePilules(); rendreListe(); flip(document.getElementById('detail'), rendreDetail);
+  api('lignes?id=eq.' + encodeURIComponent(lid), { method: 'DELETE', prefer: 'return=minimal' })
+    .catch(function (e) {
+      d.lignes.splice(pos, 0, l);
+      erreur = 'Suppression non enregistrée. ' + humain(e); rendre();
+    });
+}
+
+function ajouterLigne(d) {
+  var ref = (ajout.ref || '').trim().toUpperCase();
+  var q = parseInt(String(ajout.du).replace(/\D/g, ''), 10);
+  if (!ref) { ajout.err = 'Indique une référence.'; rendreDetail(); return; }
+  if (!q || q <= 0) { ajout.err = 'Indique une quantité supérieure à 0.'; rendreDetail(); return; }
+  if (d.lignes.some(function (l) { return l.ref.toUpperCase() === ref; })) {
+    ajout.err = 'Cette référence figure déjà sur le bon.'; rendreDetail(); return;
+  }
+  var des = (ajout.des || '').trim();
+  if (!des) {
+    var t = CATALOGUE.filter(function (c) { return c[0].toUpperCase() === ref; })[0];
+    if (t) des = t[1];
+  }
+  var maxi = d.lignes.reduce(function (m, l) { return Math.max(m, l.ordre); }, 0);
+  api('lignes', { method: 'POST', body: [{
+      bon_id: d.id, ordre: maxi + 1, reference: ref, designation: des || null,
+      qte_due: q, qte_expediee: 0, a_verifier: false,
+      appariement: 'ajout manuel', modifie_par: moi
+    }] })
+    .then(function (r) {
+      ajout = null;
+      return charger(true);
+    })
+    .catch(function (e) {
+      ajout.err = /une_reference_par_bon/.test(e.message || '')
+        ? 'Cette référence figure déjà sur le bon.' : humain(e);
+      rendreDetail();
+    });
+}
+
+/* Enregistre l'ordre affiché après un glisser-déposer. */
+function enregistrerOrdre(d, sequence) {
+  sequence.forEach(function (l, i) { l.ordre = i; });
+  rendreDetail();
+  Promise.all(sequence.map(function (l, i) {
+    return api('lignes?id=eq.' + encodeURIComponent(l.id),
+               { method: 'PATCH', body: { ordre: i }, prefer: 'return=minimal' });
+  })).catch(function (e) {
+    erreur = 'Ordre non enregistré. ' + humain(e); rendre();
+  });
+}
+
+
+/* --------------------------------------------------------------------------
+   Saisie manuelle d'un bon
+   Pour les cas que le scan ne couvre pas : une facture, dont la mise en page
+   n'a rien à voir avec celle d'un bon de livraison.
+   -------------------------------------------------------------------------- */
+function aujourdhui() {
+  var d = new Date();
+  return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2)
+       + '/' + d.getFullYear();
+}
+function nouveauBrouillon() {
+  return {
+    num: '', vref: '', cmde: '', date: aujourdhui(),
+    nature: 'livraison',
+    op: moi || '',
+    lignes: [{ ref: '', des: '', du: '' }],
+    err: ''
+  };
+}
+function frToIso(f) {
+  var m = String(f).match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? m[3] + '-' + m[2] + '-' + m[1] : null;
+}
+
+function rendreSaisie() {
+  var el = document.getElementById('detail'), b = brouillon;
+  var h = '<div class="dh"><div class="meta">'
+    + '<div class="kv big"><span>Nouveau bon</span><b>Saisie manuelle</b></div>'
+    + '<div class="kv"><span>Quand l\'utiliser</span><b style="font-size:13px;font-weight:400">'
+    + 'Facture, ou bon illisible au scan</b></div>'
+    + '</div><div class="acts">'
+    + '<button class="btn" id="annuler">Annuler</button>'
+    + '<button class="btn pri" id="enregistrer">Enregistrer le bon</button></div></div>';
+
+  h += '<div class="saisie">'
+    + '<div class="sgrid">'
+    + '<label class="ch"><span>Nature du document <i>obligatoire</i></span>'
+    + '<div class="seg2" id="f-nature">'
+    + ['livraison', 'commande'].map(function (n) {
+        return '<button type="button" data-nat="' + n + '" aria-pressed="'
+             + (b.nature === n ? 'true' : 'false') + '">'
+             + (n === 'commande' ? 'CMD' : 'BL') + '</button>'; }).join('')
+    + '</div></label>'
+    + champ('N&deg; de bon', 'f-num', b.num, 'ex. 0900512', 'obligatoire')
+    + champ('V/r&eacute;f&eacute;rence SDIS', 'f-vref', b.vref, 'ex. T3263271')
+    + champ('N&deg; commande', 'f-cmde', b.cmde, 'ex. 0046259')
+    + champ('Date', 'f-date', b.date, 'JJ/MM/AAAA')
+    + '<label class="ch"><span>Op&eacute;rateur</span><select id="f-op">'
+    + '<option value="">&mdash;</option>'
+    + Object.keys(CODES).map(function (c) { return CODES[c]; }).sort()
+        .map(function (n) {
+          return '<option value="' + esc(n) + '"' + (n === b.op ? ' selected' : '') + '>'
+               + esc(n) + '</option>'; }).join('')
+    + '</select></label>'
+    + '</div>';
+
+  h += '<div class="slignes"><table><thead><tr>'
+    + '<th style="width:34%">R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
+    + '<th class="n" style="width:90px">Qt&eacute; due</th><th style="width:44px"></th>'
+    + '</tr></thead><tbody>';
+  b.lignes.forEach(function (l, i) {
+    h += '<tr>'
+      + '<td><input class="si mono" id="l-ref-' + i + '" value="' + esc(l.ref) + '" '
+        + 'list="refs" autocomplete="off" placeholder="tape 3 lettres..."></td>'
+      + '<td><input class="si" id="l-des-' + i + '" value="' + esc(l.des) + '" '
+        + 'placeholder="d&eacute;signation"></td>'
+      + '<td><input class="si n" id="l-du-' + i + '" value="' + esc(l.du) + '" '
+        + 'inputmode="numeric" placeholder="0"></td>'
+      + '<td><button class="sdel" data-del="' + i + '" aria-label="Supprimer la ligne"'
+        + (b.lignes.length < 2 ? ' disabled' : '') + '>&times;</button></td>'
+      + '</tr>';
+  });
+  h += '</tbody></table>'
+    + '<button class="btn" id="plus" style="margin:12px 0 0">+ Ajouter une ligne</button>'
+    + '</div>';
+  if (b.err) h += '<p class="serr">' + esc(b.err) + '</p>';
+  h += '</div>';
+  el.innerHTML = h;
+
+  // autocomplétion : la liste des références réellement vendues à ce client
+  if (!document.getElementById('refs')) {
+    var dl = document.createElement('datalist'); dl.id = 'refs';
+    dl.innerHTML = CATALOGUE.map(function (c) {
+      return '<option value="' + esc(c[0]) + '">' + esc(c[1]) + '</option>'; }).join('');
+    document.body.appendChild(dl);
+  }
+}
+
+function champ(lib, id, val, ph, note) {
+  return '<label class="ch"><span>' + lib + (note ? ' <i>' + note + '</i>' : '') + '</span>'
+    + '<input id="' + id + '" value="' + esc(val) + '" placeholder="' + ph + '" autocomplete="off"></label>';
+}
+
+/* Relit les champs du formulaire dans le brouillon (avant tout redessin). */
+function lireSaisie() {
+  var b = brouillon; if (!b) return;
+  function v(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
+  b.num = v('f-num'); b.vref = v('f-vref'); b.cmde = v('f-cmde');
+  b.date = v('f-date'); b.op = v('f-op');
+  // b.nature n'est pas un champ de saisie : il est posé au clic sur BL / CMD.
+  b.lignes.forEach(function (l, i) {
+    l.ref = v('l-ref-' + i).toUpperCase(); l.des = v('l-des-' + i); l.du = v('l-du-' + i);
+    if (l.ref && !l.des) {                       // désignation reprise du catalogue
+      var t = CATALOGUE.filter(function (c) { return c[0].toUpperCase() === l.ref; })[0];
+      if (t) l.des = t[1];
+    }
+  });
+}
+
+function enregistrerBrouillon() {
+  lireSaisie();
+  var b = brouillon;
+  var num = b.num.replace(/\D/g, '');
+  if (!num) { b.err = 'Le n° de bon est obligatoire.'; rendreSaisie(); return; }
+  var iso = frToIso(b.date);
+  if (!iso) { b.err = 'Date attendue au format JJ/MM/AAAA.'; rendreSaisie(); return; }
+  var lignes = b.lignes
+    .filter(function (l) { return l.ref && parseFloat(l.du) > 0; })
+    .map(function (l, i) {
+      return { ordre: i, reference: l.ref, designation: l.des || null,
+               qte_due: parseFloat(l.du), a_verifier: false, appariement: 'saisie' };
+    });
+  if (!lignes.length) { b.err = 'Il faut au moins une ligne avec une référence et une quantité.';
+                        rendreSaisie(); return; }
+  var vus = {}, doublon = null;
+  lignes.forEach(function (l) { if (vus[l.reference]) doublon = l.reference; vus[l.reference] = 1; });
+  if (doublon) { b.err = 'La référence ' + doublon + ' apparaît deux fois.'; rendreSaisie(); return; }
+
+  b.err = ''; rendreSaisie();
+  api('bons', { method: 'POST', body: [{
+      num_bon: num.replace(/^0+(?=\d{7})/, '').padStart(7, '0'),
+      exercice: String(new Date().getFullYear()),
+      client: '30258', depot: '33',
+      date_bon: iso,
+      vreference: b.vref || null,
+      num_commande: b.cmde || null,
+      operateur: b.op || null,
+      nature: b.nature,
+      source: 'saisie manuelle'
+    }] })
+    .then(function (r) {
+      var id = r[0].id;
+      lignes.forEach(function (l) { l.bon_id = id; });
+      return api('lignes', { method: 'POST', body: lignes, prefer: 'return=minimal' });
+    })
+    .then(function () {
+      brouillon = null; vue = 'bons';
+      return charger(true);
+    })
+    .catch(function (e) {
+      var m = humain(e);
+      if (/bons_num_bon_key|bons_nature_num_idx|duplicate key/i.test(e.message || ''))
+        m = 'Ce numéro existe déjà en ' + (b.nature === 'commande' ? 'CMD' : 'BL') + '.';
+      brouillon.err = m; rendreSaisie();
+    });
+}
+
+/* --------------------------------------------------------------------------
+   Écran de vérification — la machine propose, l'opérateur tranche
+   -------------------------------------------------------------------------- */
+function douteSurRef(l) { return /r.f.rence/i.test(l.motif || ''); }
+function norefs(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+var PICTOS = {
+  ok:   '<path d="M4 12l6 6L20 6"/>',
+  brut: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+  ko:   '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/>'
+};
+function bouton(cls, id, action, libelle, infobulle) {
+  return '<button class="' + cls + '" data-' + action + '="' + id + '" '
+    + 'title="' + infobulle + '">'
+    + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+    + 'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">'
+    + PICTOS[action] + '</svg>' + libelle + '</button>';
+}
+
+function lignesADouter() {
+  var out = [];
+  DATA.forEach(function (d) {
+    d.lignes.forEach(function (l) { if (l.verif) out.push({ d: d, l: l }); });
+  });
+  return out;
+}
+
+function rendreVerif() {
+  var el = document.getElementById('detail');
+  var liste = lignesADouter();
+  var h = '<div class="dh"><div class="meta">'
+    + '<div class="kv big"><span>Contr&ocirc;le de lecture</span><b>'
+    + liste.length + ' ligne' + (liste.length > 1 ? 's' : '') + '</b></div>'
+    + '<div class="kv"><span>Comment faire</span><b style="font-size:13px;font-weight:400">'
+    + 'Liasse en main, compare et tranche</b></div>'
+    + '</div><div class="acts">'
+    + '<button class="btn" id="retour">Retour aux bons</button></div></div>';
+
+  if (!liste.length) {
+    h += '<div class="empty">Rien &agrave; v&eacute;rifier.<br>'
+       + 'Toutes les lignes ont &eacute;t&eacute; lues avec certitude ou d&eacute;j&agrave; valid&eacute;es.</div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="revs">';
+  liste.forEach(function (p) {
+    var d = p.d, l = p.l, ref = douteSurRef(l);
+    h += '<div class="rev" data-rev="' + l.id + '">'
+      + '<div class="rev-top"><span class="rev-bon">' + esc(d.num) + '</span>'
+      + '<span class="rev-vref">' + esc(d.vref) + '</span>'
+      + '<span class="rev-des">' + esc(l.des) + '</span></div>'
+      + '<div class="rev-mid">';
+
+    // Le lecteur a-t-il proposé autre chose que ce qu'il a lu ?
+    var corrigee = l.ocr && norefs(l.ocr) !== norefs(l.ref);
+
+    h += '<span class="rev-lbl">R&eacute;f&eacute;rence</span>';
+    if (corrigee) {
+      h += '<span class="rev-ocr">' + esc(l.ocr) + '</span>'
+        + '<span class="rev-fl">&rarr;</span>'
+        + '<span class="rev-prop">' + refHtml(l.ref) + '</span>';
+    } else {
+      h += '<span class="rev-prop">' + refHtml(l.ref) + '</span>';
+    }
+    h += '<span class="rev-lbl">Quantit&eacute;</span>'
+      + '<span class="rev-ocr">' + l.du + '</span>'
+      + (l.motif ? '<span class="rev-motif">' + esc(l.motif.replace(/\s*—\s*lu\s*«.*$/, '')) + '</span>' : '');
+
+    h += '</div><div class="rev-act">';
+    if (corrigee) {
+      // Trois choix : la proposition, la lecture d'origine, ou autre chose.
+      h += bouton('ok', l.id, 'ok', 'Accepter', 'Retenir ' + esc(l.ref))
+        + bouton('neutre', l.id, 'brut', 'Garder', 'Retenir la lecture d\'origine : ' + esc(l.ocr))
+        + bouton('neutre', l.id, 'ko', 'Modifier', 'Saisir d\'autres valeurs');
+    } else {
+      h += bouton('ok', l.id, 'ok', 'Valider', 'La lecture est juste')
+        + bouton('neutre', l.id, 'ko', 'Modifier', 'Saisir d\'autres valeurs');
+    }
+    h += '</div></div>';
+  });
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+/* Valider : la proposition devient la vérité, la ligne sort de la liste. */
+function valider(lid) {
+  var p = lignesADouter().filter(function (x) { return x.l.id === lid; })[0];
+  if (!p) return;
+  p.l.verif = false; p.l.verifiePar = moi;
+  rendrePilules(); rendreVerif();
+  api('lignes?id=eq.' + encodeURIComponent(lid),
+      { method: 'PATCH', body: { verifie_par: moi, modifie_par: moi }, prefer: 'return=minimal' })
+    .catch(function (e) {
+      p.l.verif = true; erreur = 'Validation non enregistrée. ' + humain(e); rendre();
+    });
+}
+
+/* Garder : la lecture d'origine devient la vérité, la proposition est écartée. */
+function garderLecture(lid) {
+  var p = lignesADouter().filter(function (x) { return x.l.id === lid; })[0];
+  if (!p) return;
+  var l = p.l, avant = l.ref;
+  if (!l.ocr) return;
+  l.ref = l.ocr.trim().toUpperCase(); l.verif = false; l.verifiePar = moi;
+  rendrePilules(); rendreVerif();
+  api('lignes?id=eq.' + encodeURIComponent(lid),
+      { method: 'PATCH', prefer: 'return=minimal',
+        body: { reference: l.ref, verifie_par: moi, modifie_par: moi } })
+    .catch(function (e) {
+      l.ref = avant; l.verif = true;
+      erreur = 'Choix non enregistré. ' + humain(e); rendre();
+    });
+}
+
+/* Modifier : référence ET quantité en même temps.
+
+   Le programme sait qu'une ligne est douteuse, pas toujours lequel des deux
+   champs l'est. Plutôt que de deviner, on ouvre les deux : l'opérateur a la
+   liasse sous les yeux, il tranche plus vite que n'importe quelle heuristique. */
+function corriger(lid, bouton) {
+  var p = lignesADouter().filter(function (x) { return x.l.id === lid; })[0];
+  if (!p) return;
+  var l = p.l;
+  var zone = bouton.closest('.rev').querySelector('.rev-mid');
+  // Déjà ouvert : on redonne le focus au lieu de recréer des champs, sinon les
+  // anciens restent référencés et l'enregistrement lit des valeurs périmées.
+  var deja = zone.querySelector('#cor-ref');
+  if (deja) { deja.focus(); deja.select(); return; }
+  zone.innerHTML = '<span class="rev-lbl">R&eacute;f&eacute;rence</span>'
+    + '<input class="revin" id="cor-ref" list="refs" autocomplete="off" value="' + esc(l.ref) + '">'
+    + '<span class="rev-lbl">Quantit&eacute;</span>'
+    + '<input class="revin court" id="cor-du" inputmode="numeric" value="' + esc(l.du) + '">'
+    + '<span class="rev-lbl">Entr&eacute;e pour enregistrer, &Eacute;chap pour annuler</span>';
+  var iref = document.getElementById('cor-ref'), idu = document.getElementById('cor-du');
+  iref.focus(); iref.select();
+  var fini = false;
+  function fin(ok) {
+    if (fini) return; fini = true;
+    if (!ok) { rendreVerif(); return; }
+    var nref = iref.value.trim().toUpperCase();
+    var ndu = parseInt(String(idu.value).replace(/\D/g, ''), 10);
+    if (!nref || !ndu || ndu <= 0) { rendreVerif(); return; }
+    var champs = { verifie_par: moi, modifie_par: moi };
+    if (nref !== l.ref.toUpperCase()) champs.reference = nref;
+    if (ndu !== l.du) {
+      champs.qte_due = ndu;
+      // Réduire la quantité due peut rendre la préparation, puis la livraison,
+      // supérieures au dû. On les ramène dans les clous d'un coup.
+      if (l.exp > ndu) champs.qte_expediee = ndu;
+      if (l.liv > ndu) champs.qte_livree = ndu;
+    }
+    var avant = { ref: l.ref, du: l.du, verif: l.verif };
+    if (champs.reference) l.ref = nref;
+    if (champs.qte_due) l.du = ndu;
+    l.verif = false; l.verifiePar = moi;
+    rendrePilules(); rendreVerif();
+    api('lignes?id=eq.' + encodeURIComponent(lid),
+        { method: 'PATCH', body: champs, prefer: 'return=minimal' })
+      .catch(function (e) {
+        l.ref = avant.ref; l.du = avant.du; l.verif = avant.verif;
+        erreur = 'Correction non enregistrée. ' + humain(e); rendre();
+      });
+  }
+  [iref, idu].forEach(function (i) {
+    i.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') fin(true);
+      if (ev.key === 'Escape') fin(false);
+    });
+  });
+  zone.addEventListener('focusout', function () {
+    setTimeout(function () {
+      if (!zone.contains(document.activeElement)) fin(true);
+    }, 60);
+  });
+}
+
+/* --------------------------------------------------------------------------
+   Saisie directe de la quantité expédiée
+   Cliquer cinquante fois sur « + » pour solder une ligne de 50 pièces n'a
+   aucun sens : le compteur s'ouvre en saisie au clic.
+   -------------------------------------------------------------------------- */
+function editerExp(d, lid, cible) {
+  var l = d.lignes.filter(function (x) { return x.id === lid; })[0]; if (!l) return;
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'duin'; inp.value = l.exp;
+  inp.setAttribute('inputmode', 'numeric');
+  inp.setAttribute('aria-label', 'Quantité expédiée');
+  cible.replaceWith(inp); inp.focus(); inp.select();
+  var fini = false;
+  function fin(ok) {
+    if (fini) return; fini = true;
+    var v = parseInt(String(inp.value).replace(/\D/g, ''), 10);
+    if (ok && !isNaN(v) && v !== l.exp) {
+      if (v > l.du) {
+        erreur = 'Impossible d\'expédier ' + v + ' : seulement ' + l.du
+               + ' d\u00fb sur cette ligne.';
+        rendre(); return;
+      }
+      ecrire(l, { qte_expediee: v });
+      rendrePilules(); rendreListe();
+    } else { rendreDetail(); }
+  }
+  inp.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') fin(true);
+    if (ev.key === 'Escape') fin(false);
+  });
+  inp.addEventListener('blur', function () { fin(true); });
+}
+
+/* --------------------------------------------------------------------------
+   Correction de la quantité due
+   -------------------------------------------------------------------------- */
+function editerDu(d, lid, cible) {
+  var l = d.lignes.filter(function (x) { return x.id === lid; })[0]; if (!l) return;
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'duin'; inp.value = l.du;
+  inp.setAttribute('inputmode', 'numeric');
+  inp.setAttribute('aria-label', 'Quantité due');
+  cible.replaceWith(inp); inp.focus(); inp.select();
+  var fini = false;
+  function valider(ok) {
+    if (fini) return; fini = true;
+    var v = parseInt(String(inp.value).replace(/\D/g, ''), 10);
+    if (ok && !isNaN(v) && v > 0 && v !== l.du) {
+      var champs = { qte_due: v };
+      if (l.exp > v) champs.qte_expediee = v;
+      ecrire(l, champs);
+    } else { rendre(); }
+  }
+  inp.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') valider(true);
+    if (ev.key === 'Escape') valider(false);
+  });
+  inp.addEventListener('blur', function () { valider(true); });
+}
+
+/* --------------------------------------------------------------------------
+   Événements
+   -------------------------------------------------------------------------- */
+document.getElementById('q').addEventListener('input', function (e) {
+  q = e.target.value; flip(document.getElementById('lwrap'), rendreListe);
+});
+document.getElementById('seg').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  filtre = b.dataset.f; pilule = null;
+  [].forEach.call(this.querySelectorAll('button'), function (c) {
+    c.setAttribute('aria-pressed', c === b);
+  });
+  rendrePilules(); flip(document.getElementById('lwrap'), rendreListe);
+});
+[['pLate', 'late'], ['pRal', 'ral']].forEach(function (p) {
+  document.getElementById(p[0]).addEventListener('click', function () {
+    pilule = pilule === p[1] ? null : p[1]; filtre = 'all';
+    [].forEach.call(document.querySelectorAll('#seg button'), function (c) {
+      c.setAttribute('aria-pressed', c.dataset.f === 'all');
+    });
+    rendrePilules(); flip(document.getElementById('lwrap'), rendreListe);
+  });
+});
+document.getElementById('fop').addEventListener('change', function () {
+  fop = this.value; flip(document.getElementById('lwrap'), rendreListe);
+});
+document.getElementById('lwrap').addEventListener('click', function (e) {
+  if (e.target.closest('#disc')) {
+    ouvSoldes = !ouvSoldes;
+    var dd = document.getElementById('disc'), ll = document.getElementById('solList');
+    dd.setAttribute('aria-expanded', ouvSoldes); if (ll) ll.hidden = !ouvSoldes;
+    return;
+  }
+  var b = e.target.closest('.item'); if (!b) return;
+  sel = b.dataset.id; vue = 'bons'; rendrePilules(); rendreListe(); rendreCentre();
+});
+document.getElementById('detail').addEventListener('change', function (e) {
+  if (vue === 'bons' && ajout && e.target.id === 'a-ref') {
+    var v0 = e.target.value.trim().toUpperCase();
+    var t0 = CATALOGUE.filter(function (c) { return c[0].toUpperCase() === v0; })[0];
+    var dd = document.getElementById('a-des');
+    if (t0 && dd && !dd.value.trim()) dd.value = t0[1];
+    return;
+  }
+  if (vue !== 'saisie') return;
+  var m = (e.target.id || '').match(/^l-ref-(\d+)$/);
+  if (!m) return;
+  var i = +m[1], v = e.target.value.trim().toUpperCase();
+  var t = CATALOGUE.filter(function (c) { return c[0].toUpperCase() === v; })[0];
+  var des = document.getElementById('l-des-' + i);
+  if (t && des && !des.value.trim()) des.value = t[1];
+});
+document.getElementById('detail').addEventListener('keydown', function (e) {
+  if (vue === 'bons' && ajout && e.key === 'Enter' && /^a-(ref|des|du)$/.test(e.target.id || '')) {
+    e.preventDefault();
+    var d0 = DATA.filter(function (x) { return x.id === sel; })[0];
+    if (d0) agir(function () { lireAjout(); ajouterLigne(d0); });
+    return;
+  }
+  if (vue !== 'saisie' || e.key !== 'Enter') return;
+  if (!/^l-du-/.test(e.target.id || '')) return;
+  e.preventDefault();
+  lireSaisie(); brouillon.lignes.push({ ref: '', des: '', du: '' }); rendreSaisie();
+  var d = document.getElementById('l-ref-' + (brouillon.lignes.length - 1));
+  if (d) d.focus();
+});
+
+document.getElementById('nouveau').addEventListener('click', function () {
+  agir(function () {
+    brouillon = nouveauBrouillon(); vue = 'saisie'; rendrePilules(); rendreCentre();
+    var n = document.getElementById('f-num'); if (n) n.focus();
+  });
+});
+
+
+function lireAjout() {
+  if (!ajout) return;
+  function v(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
+  ajout.ref = v('a-ref'); ajout.des = v('a-des'); ajout.du = v('a-du');
+}
+
+/* Glisser-déposer des lignes. La poignée porte l'attribut draggable pour que
+   les boutons +/- de la ligne restent cliquables normalement. */
+(function () {
+  var det = document.getElementById('detail');
+
+  det.addEventListener('dragstart', function (e) {
+    var p = e.target.closest('[data-drag]'); if (!p) return;
+    glisse = +p.dataset.drag;
+    var tr = p.closest('tr');
+    tr.classList.add('drag');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(glisse));
+    if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(tr, 20, 14);
+  });
+
+  det.addEventListener('dragover', function (e) {
+    if (glisse === null) return;
+    var tr = e.target.closest('tr[data-pos]'); if (!tr) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var r = tr.getBoundingClientRect();
+    var apres = (e.clientY - r.top) > r.height / 2;
+    [].forEach.call(det.querySelectorAll('tr[data-pos]'), function (x) {
+      x.classList.remove('sur-haut', 'sur-bas'); });
+    tr.classList.add(apres ? 'sur-bas' : 'sur-haut');
+  });
+
+  det.addEventListener('drop', function (e) {
+    if (glisse === null) return;
+    var tr = e.target.closest('tr[data-pos]'); if (!tr) return;
+    e.preventDefault();
+    var cible = +tr.dataset.pos;
+    var r = tr.getBoundingClientRect();
+    if ((e.clientY - r.top) > r.height / 2) cible++;
+    var d = DATA.filter(function (x) { return x.id === sel; })[0];
+    if (!d) return;
+    var seq = lignesOrdonnees(d);
+    var depuis = glisse;
+    if (cible > depuis) cible--;
+    if (cible === depuis) { nettoyerGlisse(); return; }
+    var mobile = seq.splice(depuis, 1)[0];
+    seq.splice(cible, 0, mobile);
+    nettoyerGlisse();
+    agir(function () { enregistrerOrdre(d, seq); });
+  });
+
+  det.addEventListener('dragend', nettoyerGlisse);
+
+  function nettoyerGlisse() {
+    glisse = null;
+    [].forEach.call(det.querySelectorAll('tr'), function (x) {
+      x.classList.remove('sur-haut', 'sur-bas', 'drag'); });
+  }
+})();
+
+document.getElementById('who').addEventListener('click', function () { demander(null); });
+/* --------------------------------------------------------------------------
+   Thème clair / sombre
+
+   Trois états : « clair », « sombre », et rien du tout — ce dernier suit le
+   réglage du système, et c'est le défaut. Le choix est mémorisé par poste,
+   pas par utilisateur : au comptoir, c'est l'écran et sa lumière qui
+   commandent, pas la personne qui passe devant.
+   -------------------------------------------------------------------------- */
+var SOLEIL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
+  + 'stroke="currentColor" stroke-width="2" stroke-linecap="round">'
+  + '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M4.2 4.2l1.4 1.4'
+  + 'M18.4 18.4l1.4 1.4M2.5 12h2M19.5 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>';
+var LUNE = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" '
+  + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" '
+  + 'stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 '
+  + '10.5 10.5z"/></svg>';
+
+function sombreActuel() {
+  var t = document.documentElement.getAttribute('data-theme');
+  if (t) return t === 'dark';
+  return !window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+function majTheme() {
+  var b = document.getElementById('theme');
+  if (!b) return;
+  var sombre = sombreActuel();
+  b.innerHTML = sombre ? SOLEIL : LUNE;
+  b.title = sombre ? 'Passer en th&egrave;me clair' : 'Passer en th&egrave;me sombre';
+  b.setAttribute('aria-label', sombre ? 'Passer en thème clair' : 'Passer en thème sombre');
+}
+document.getElementById('theme').addEventListener('click', function () {
+  var neuf = sombreActuel() ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', neuf);
+  try { localStorage.setItem('sdis-theme', neuf); } catch (e) { /* stockage bloqué */ }
+  majTheme();
+});
+// Si personne n'a choisi, on suit le système jusque dans ses changements.
+if (window.matchMedia) {
+  var mq = window.matchMedia('(prefers-color-scheme: light)');
+  if (mq.addEventListener) mq.addEventListener('change', majTheme);
+}
+majTheme();
+
+document.getElementById('refresh').addEventListener('click', function () { charger(false); });
+
+document.getElementById('recap').addEventListener('click', function () {
+  imprimer(feuilleRecap());
+});
+
+document.getElementById('pVerif').addEventListener('click', function () {
+  vue = vue === 'verif' ? 'bons' : 'verif';
+  rendrePilules(); rendreCentre();
+});
+
+document.getElementById('detail').addEventListener('click', function (e) {
+  if (vue === 'saisie') {
+    if (e.target.closest('#annuler')) {
+      brouillon = null; vue = 'bons'; rendrePilules(); rendreCentre(); return;
+    }
+    if (e.target.closest('#enregistrer')) { agir(enregistrerBrouillon); return; }
+    var nat = e.target.closest('[data-nat]');
+    if (nat) {
+      // On bascule sur place : redessiner viderait les champs déjà remplis.
+      brouillon.nature = nat.dataset.nat;
+      [].forEach.call(nat.parentNode.querySelectorAll('button'), function (x) {
+        x.setAttribute('aria-pressed', String(x.dataset.nat === brouillon.nature));
+      });
+      return;
+    }
+    if (e.target.closest('#plus')) {
+      lireSaisie(); brouillon.lignes.push({ ref: '', des: '', du: '' }); rendreSaisie();
+      var champs = document.querySelectorAll('#detail .slignes input');
+      if (champs.length) champs[champs.length - 3].focus();
+      return;
+    }
+    var d = e.target.closest('[data-del]');
+    if (d) {
+      lireSaisie(); brouillon.lignes.splice(+d.dataset.del, 1); rendreSaisie(); return;
+    }
+    return;
+  }
+  if (vue === 'verif') {
+    if (e.target.closest('#retour')) { vue = 'bons'; rendrePilules(); rendreCentre(); return; }
+    var bo = e.target.closest('[data-ok]');
+    if (bo) { agir(function () { valider(bo.dataset.ok); }); return; }
+    var bb = e.target.closest('[data-brut]');
+    if (bb) { agir(function () { garderLecture(bb.dataset.brut); }); return; }
+    var bk = e.target.closest('[data-ko]');
+    if (bk) { agir(function () { corriger(bk.dataset.ko, bk); }); return; }
+    return;
+  }
+  var d = DATA.filter(function (x) { return x.id === sel; })[0]; if (!d) return;
+
+  // Bascule Lignes / Historique. Pas de code opérateur : on ne modifie rien.
+  if (e.target.closest('#histo')) {
+    vueBon = vueBon === 'histo' ? 'lignes' : 'histo';
+    rendreDetail();
+    return;
+  }
+
+  // Le bon remis au client porte le nom de celui qui l'imprime : on demande
+  // donc son code, comme pour toute action tracée.
+  if (e.target.closest('#imprimer')) {
+    agir(function () { lancerImpression(d); });
+    return;
+  }
+
+  var ent = e.target.closest('[data-ent]');
+  if (ent) { agir(function () { editerEntete(d, ent.dataset.ent, ent); }); return; }
+
+  var supp = e.target.closest('[data-supp]');
+  if (supp) { agir(function () { supprimerLigne(d, supp.dataset.supp); }); return; }
+
+  if (e.target.closest('#addl')) {
+    agir(function () {
+      ajout = { ref: '', des: '', du: '', err: '' }; rendreDetail();
+      var a = document.getElementById('a-ref'); if (a) a.focus();
+    });
+    return;
+  }
+  if (e.target.closest('#a-non')) { ajout = null; rendreDetail(); return; }
+  if (e.target.closest('#a-ok')) { agir(function () { lireAjout(); ajouterLigne(d); }); return; }
+
+  var ex = e.target.closest('[data-exp]');
+  if (ex) { agir(function () { editerExp(d, ex.dataset.exp, ex); }); return; }
+
+  var du = e.target.closest('[data-du]');
+  if (du) { agir(function () { editerDu(d, du.dataset.du, du); }); return; }
+
+  var st = e.target.closest('[data-m]');
+  if (st) {
+    var lid = st.dataset.l, m = +st.dataset.m;
+    agir(function () {
+      var l = d.lignes.filter(function (x) { return x.id === lid; })[0]; if (!l) return;
+      var v = Math.max(0, Math.min(l.du, l.exp + m));
+      if (v === l.exp) return;
+      ecrire(l, { qte_expediee: v });
+      var tr = document.querySelector('[data-fk="l' + lid + '"]');
+      if (tr) { tr.classList.add('flash'); setTimeout(function () { tr.classList.remove('flash'); }, 520); }
+    });
+    return;
+  }
+  if (e.target.id === 'tout') {
+    agir(function () {
+      var aFaire = d.lignes.filter(function (l) { return l.exp < l.du; });
+      Promise.all(aFaire.map(function (l) { return ecrire(l, { qte_expediee: l.du }); }))
+        .then(function () { flip(document.getElementById('lwrap'), rendreListe); });
+    });
+  }
+});
+
+/* Rafraîchissement : les 5 postes travaillent sur la même base. */
+/* Le rafraîchissement automatique reconstruit le panneau central. Il doit donc
+   se taire dès que l'écran contient une saisie en cours, sinon il efface ce que
+   l'opérateur est en train de taper — c'était le bug du formulaire de création. */
+function saisieEnCours() {
+  if (document.getElementById('ov')) return true;        // fenêtre d'identification
+  if (vue === 'saisie') return true;                     // création d'un bon
+  if (ajout) return true;                                // ajout d'une ligne
+  if (document.querySelector('.duin, .revin, .entin')) return true;
+  var a = document.activeElement;
+  return !!(a && (a.tagName === 'INPUT' || a.tagName === 'SELECT'));
+}
+setInterval(function () { if (!saisieEnCours()) charger(true); },
+            CONFIG.rafraichirSecondes * 1000);
+window.addEventListener('focus', function () { if (!saisieEnCours()) charger(true); });
+
+/* Liste des opérateurs dans le filtre, une fois les données chargées */
+function majFiltreOperateurs() {
+  var s = document.getElementById('fop'), vus = {}, garde = s.value;
+  DATA.forEach(function (d) { if (d.op) vus[d.op] = 1; });
+  s.innerHTML = '<option value="">Tous les op&eacute;rateurs</option>';
+  Object.keys(vus).sort().forEach(function (o) {
+    var opt = document.createElement('option'); opt.value = o; opt.textContent = court(o); s.appendChild(opt);
+  });
+  s.value = garde;
+}
+var _rendre = rendre;
+rendre = function () { _rendre(); majFiltreOperateurs(); };
+
+(function () {                       // catalogue de références, pour l'autocomplétion
+  var dl = document.createElement('datalist'); dl.id = 'refs';
+  dl.innerHTML = CATALOGUE.map(function (c) {
+    return '<option value="' + esc(c[0]) + '">' + esc(c[1]) + '</option>'; }).join('');
+  document.body.appendChild(dl);
+})();
+
+majQui();
+charger(false);
+})();
+</script>
+</body>
+</html>

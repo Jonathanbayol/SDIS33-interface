@@ -1,0 +1,20 @@
+# --- Secrets : ne jamais commiter ---
+config.ini
+*.ini
+.env
+.env.*
+
+# --- Documents client (bons, scans, exports) ---
+scans/
+*.pdf
+*.zip
+
+# --- Python ---
+__pycache__/
+*.pyc
+
+# --- Système / éditeur ---
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
