@@ -167,6 +167,10 @@ select{width:100%;font:inherit;font-size:12.5px;padding:7px 10px;border:none;bor
   background:var(--fill);color:var(--tx2);appearance:none;cursor:pointer}
 select:focus{outline:none;box-shadow:0 0 0 4px var(--blue-s)}
 .lwrap{max-height:min(66vh,760px);overflow-y:auto;padding:6px}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.zcard>.disc{margin:0;padding:14px 16px;border-radius:0;font-weight:600;color:var(--tx)}
+.zcard>.lwrap{border-top:.5px solid var(--sep2);max-height:min(50vh,560px)}
+.empty.petit{padding:22px 16px;font-size:12.5px}
 .grp{padding:12px 10px 5px;font-size:11px;font-weight:600;color:var(--tx3);
   text-transform:uppercase;letter-spacing:.05em}
 .disc{width:100%;display:flex;align-items:center;gap:7px;padding:9px 10px;margin-top:4px;
@@ -219,6 +223,7 @@ select:focus{outline:none;box-shadow:0 0 0 4px var(--blue-s)}
 .o{background:var(--orange-f)}
 .r{background:var(--red-f)}
 .b{background:var(--blue-f)}
+.rv{background:#6A4FD0}
 
 /* ============ détail ============ */
 .dh{padding:22px 24px 18px;display:flex;gap:20px 30px;align-items:flex-start;flex-wrap:wrap;
@@ -719,6 +724,21 @@ body{
 }
 .liv{font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)}
 .liv.z{color:var(--tx3);font-weight:400}
+/* Réceptionné : la couleur du badge « Réceptionné », éclaircie pour le texte. */
+.rec{font-weight:600;font-variant-numeric:tabular-nums;color:#9C86F0;cursor:default}
+:root[data-theme="light"] .rec{color:#5B3FC4}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .rec{color:#5B3FC4}}
+.rec.z{color:var(--tx3) !important;font-weight:400}
+.cpt.rc b{color:#9C86F0}
+:root[data-theme="light"] .cpt.rc b{color:#5B3FC4}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]) .cpt.rc b{color:#5B3FC4}}
+/* Corbeille du bon : en bas à droite, discrète jusqu'au survol. */
+.suppbon{margin-left:auto;display:inline-grid;place-items:center;width:30px;height:30px;
+  border-radius:50%;color:var(--tx3);transition:color .15s,background .15s,transform .15s}
+.suppbon:hover{color:#fff;background:var(--red-f);transform:scale(1.06)}
+.ch input:disabled{opacity:.35;cursor:not-allowed}
+input.maj{text-transform:uppercase}
+input.maj::placeholder{text-transform:none}
 
 /* ---- pied du bon : les trois chiffres de l'état ------------------------- */
 .foot{gap:22px}
@@ -900,7 +920,6 @@ body{
       <input id="q" type="search" autocomplete="off" placeholder="Bon, V/r&eacute;f&eacute;rence ou r&eacute;f&eacute;rence article">
     </div>
     <div class="pills">
-      <button class="pill p-red" id="pLate" aria-pressed="false"><b>0</b><span>En retard</span></button>
       <button class="pill p-org" id="pRal" aria-pressed="false"><b>0</b><span>Lignes RAL</span></button>
       <button class="pill p-b" id="pVerif" aria-pressed="false" hidden><b>0</b><span>&Agrave; v&eacute;rifier</span></button>
     </div>
@@ -916,20 +935,22 @@ body{
 </header>
 
 <p class="alerte" id="bandeau" hidden></p>
-<p class="note"><b>Rodage.</b> Les liasses papier continuent de circuler en parallèle &mdash; comparez, et signalez-moi tout écart.</p>
 
 <div class="wrap">
+  <div class="col" id="liste">
   <section class="card">
     <div class="ctrl">
       <div class="seg" id="seg">
         <button data-f="all" aria-pressed="true">Tous</button>
         <button data-f="ral" aria-pressed="false">Avec RAL</button>
-        <button data-f="late" aria-pressed="false">En retard</button>
       </div>
       <select id="fop" aria-label="Filtrer par op&eacute;rateur"><option value="">Tous les op&eacute;rateurs</option></select>
     </div>
     <div class="lwrap" id="lwrap"></div>
   </section>
+  <section class="card zcard" id="zLivre" hidden></section>
+  <section class="card zcard" id="zRecu" hidden></section>
+  </div>
   <section class="card" id="detail"></section>
 </div>
 
@@ -983,7 +1004,10 @@ function api(chemin, opts, rejoue) {
     if (!r.ok) return r.text().then(function (t) {
       var e = new Error(t || ('HTTP ' + r.status)); e.status = r.status; throw e;
     });
-    return r.status === 204 ? null : r.json();
+    // Corps vide (réponse 201 « return=minimal ») : r.json() échouait, et
+    // Safari l'affichait « The string did not match the expected pattern »
+    // alors que le bon était bien créé.
+    return r.text().then(function (t) { return t ? JSON.parse(t) : null; });
   });
 }
 
@@ -1130,21 +1154,29 @@ function prepaL(l) { return Math.max(0, l.exp - l.liv); }       // prêt, pas pa
 function ralD(d) { return d.lignes.reduce(function (s, l) { return s + ralL(l); }, 0); }
 function prepaD(d) { return d.lignes.reduce(function (s, l) { return s + prepaL(l); }, 0); }
 function livD(d) { return d.lignes.reduce(function (s, l) { return s + l.liv; }, 0); }
+function recD(d) { return d.lignes.reduce(function (s, l) { return s + l.rec; }, 0); }
+function duD(d) { return d.lignes.reduce(function (s, l) { return s + l.du; }, 0); }
 // Un bon sans aucune ligne n'est pas soldé : il reste à compléter.
 function solde(d) { return d.lignes.length > 0 && ralD(d) === 0; }
+/* Réceptionné : le SDIS a déclaré, depuis son espace, avoir reçu toutes les
+   pièces du bon. C'est la dernière étape de la vie d'un bon. */
+function recu(d) { return solde(d) && recD(d) >= duD(d); }
+/* Les trois zones de la liste. */
+function zone(d) { return recu(d) ? 'recu' : (solde(d) ? 'livre' : 'cours'); }
 function nivAge(a) { return a < VERT ? 'g' : (a <= ORANGE ? 'o' : 'r'); }
 
 /* L'état d'une ligne. La préparation passe devant : c'est l'action en cours,
    celle qui appelle un geste. */
 function etatL(l) {
   if (prepaL(l) > 0) return 'prepa';
-  if (ralL(l) === 0) return 'livre';
+  if (ralL(l) === 0) return l.rec >= l.du ? 'recu' : 'livre';
   return l.liv > 0 ? 'partiel' : 'attente';
 }
 /* L'état d'un bon suit la même règle, puis l'ancienneté sert d'alerte sur ce
    qui dort encore. */
 function statut(d) {
   if (prepaD(d) > 0) return 'prepa';
+  if (recu(d)) return 'recu';
   if (solde(d)) return 'livre';
   if (livD(d) > 0) return 'partiel';
   var n = nivAge(d.age);
@@ -1153,13 +1185,14 @@ function statut(d) {
 var LIBELLES = {
   prepa:   'En pr&eacute;paration',
   livre:   'Livr&eacute;',
+  recu:    'R&eacute;ceptionn&eacute;',
   partiel: 'Livr&eacute; partiellement',
   attente: 'En attente',
   warn:    '&Agrave; surveiller',
   late:    'En retard'
 };
 var CLASSES = {
-  prepa: 'b', livre: 'g', partiel: 'o', attente: 'n0', warn: 'o', late: 'r'
+  prepa: 'b', livre: 'g', recu: 'rv', partiel: 'o', attente: 'n0', warn: 'o', late: 'r'
 };
 function libSt(s) { return LIBELLES[s] || s; }
 function clsSt(s) { return CLASSES[s] || 'n0'; }
@@ -1254,6 +1287,9 @@ function charger(silencieux) {
             duOcr: l.qte_due_ocr == null ? null : Number(l.qte_due_ocr),
             exp: Number(l.qte_expediee),        // préparé au comptoir
             liv: Number(l.qte_livree) || 0,     // confirmé livré au client
+            rec: Number(l.qte_receptionnee) || 0,   // déclaré reçu par le SDIS
+            recPar: l.receptionne_par || '',
+            recLe: l.receptionne_le || '',
             op: l.modifie_par || b.operateur,
             verif: !!l.a_verifier,
             motif: l.motif || '',
@@ -1301,6 +1337,8 @@ function humain(e) {
     return 'Les tables sont absentes. Le script schema.sql n\'a pas encore été exécuté dans Supabase.';
   if (/pas_plus_que_du/.test(m))
     return 'Impossible d\'expédier plus que la quantité due.';
+  if (/pas_plus_que_livre/.test(m))
+    return 'Le SDIS a d\u00e9j\u00e0 r\u00e9ceptionn\u00e9 ces pi\u00e8ces : on ne peut plus les retirer de la livraison.';
   if (/une_reference_par_bon/.test(m))
     return 'Cette référence figure déjà sur ce bon.';
   return m;
@@ -1431,12 +1469,9 @@ function flip(racine, redessine) {
 function visibles() {
   var t = q.trim().toUpperCase().replace(/\s+/g, '');
   return DATA.filter(function (d) {
-    var s = statut(d);
-    if (pilule === 'late' && s !== 'late') return false;
     if (pilule === 'ral' && solde(d)) return false;
     if (!pilule) {
       if (filtre === 'ral' && solde(d)) return false;
-      if (filtre === 'late' && s !== 'late') return false;
     }
     if (fop && d.op !== fop && !d.lignes.some(function (l) { return l.op === fop; })) return false;
     if (!t) return true;
@@ -1452,21 +1487,18 @@ function visibles() {
    Rendu
    -------------------------------------------------------------------------- */
 function rendrePilules() {
-  var late = 0, ral = 0;
+  var ral = 0;
   DATA.forEach(function (d) {
-    if (statut(d) === 'late') late++;
     d.lignes.forEach(function (l) { if (ralL(l) > 0) ral++; });
   });
   var av = 0;
   DATA.forEach(function (d) { d.lignes.forEach(function (l) { if (l.verif) av++; }); });
-  document.querySelector('#pLate b').textContent = late;
   document.querySelector('#pRal b').textContent = ral;
   var pv = document.getElementById('pVerif');
   pv.querySelector('b').textContent = av;
   pv.hidden = av === 0 && vue !== 'verif';
   document.getElementById('nouveau').setAttribute('aria-pressed', vue === 'saisie');
   pv.setAttribute('aria-pressed', vue === 'verif');
-  document.getElementById('pLate').setAttribute('aria-pressed', pilule === 'late');
   document.getElementById('pRal').setAttribute('aria-pressed', pilule === 'ral');
 }
 
@@ -1487,35 +1519,51 @@ function ligneBon(d) {
     + '<span class="r2">' + avatar(d.op) + '<span>' + esc(d.date.slice(0, 5)) + '</span>'
     + '<span class="bar"><u style="width:' + pPre + '%"></u>'
       + '<i style="width:' + pLiv + '%"></i></span>'
-    + (s === 'livre' ? '<span class="bdg g">Livr&eacute;</span>'
+    + (s === 'recu' ? '<span class="bdg rv">R&eacute;ceptionn&eacute;</span>'
+       : s === 'livre' ? '<span class="bdg g">Livr&eacute;</span>'
        : s === 'prepa' ? '<span class="bdg b">En pr&eacute;pa</span>'
        : '<span class="bdg ' + nivAge(d.age) + '">J+' + d.age + '</span>')
     + '</span></button>';
 }
 
+/* Trois zones : les bons en cours (nouveaux, en attente, livrés en partie),
+   les bons livrés en totalité, et les bons que le SDIS a déclarés reçus.
+   La recherche les parcourt toutes les trois et n'affiche que ce qui
+   correspond ; une zone repliée s'ouvre d'elle-même si elle a un résultat. */
+var ouvZone = { livre: false, recu: false };
+var CHEVRON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
+
 function rendreListe() {
   var el = document.getElementById('lwrap');
-  if (chargement) { el.innerHTML = '<div class="empty">Chargement&hellip;</div>'; return; }
-  var v = visibles(), act = v.filter(function (d) { return !solde(d); }), sol = v.filter(solde), h = '';
-  if (!v.length) {
-    h = '<div class="empty">' + (DATA.length ? 'Aucun bon ne correspond.'
-      : 'Aucun bon dans la base.<br>Lance le script d\'import.') + '</div>';
+  var zl = document.getElementById('zLivre'), zr = document.getElementById('zRecu');
+  if (chargement) {
+    el.innerHTML = '<div class="empty">Chargement&hellip;</div>';
+    zl.hidden = zr.hidden = true; return;
+  }
+  var v = visibles(), cherche = !!q.trim(), h = '';
+  var par = { cours: [], livre: [], recu: [] };
+  v.forEach(function (d) { par[zone(d)].push(d); });
+  if (par.cours.length) {
+    h += '<div class="grp">En cours &middot; ' + par.cours.length + '</div>';
+    par.cours.forEach(function (d) { h += ligneBon(d); });
   } else {
-    if (act.length) {
-      h += '<div class="grp">En cours &middot; ' + act.length + '</div>';
-      act.forEach(function (d) { h += ligneBon(d); });
-    }
-    if (sol.length) {
-      h += '<button class="disc" id="disc" aria-expanded="' + ouvSoldes + '">'
-        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        + 'stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>'
-        + 'Bons livr&eacute;s<span class="n">' + sol.length + '</span></button>'
-        + '<div id="solList"' + (ouvSoldes ? '' : ' hidden') + '>';
-      sol.forEach(function (d) { h += ligneBon(d); });
-      h += '</div>';
-    }
+    h = '<div class="empty petit">' + (!DATA.length ? 'Aucun bon dans la base.'
+      : cherche ? 'Aucun bon en cours ne correspond.' : 'Aucun bon en cours.') + '</div>';
   }
   el.innerHTML = h;
+  zoneRepliable(zl, 'livre', 'Bons livr&eacute;s', par.livre, cherche);
+  zoneRepliable(zr, 'recu', 'Bons r&eacute;ceptionn&eacute;s', par.recu, cherche);
+}
+
+function zoneRepliable(el, cle, titre, lot, cherche) {
+  el.hidden = cherche && !lot.length;
+  var ouvert = ouvZone[cle] || (cherche && lot.length > 0);
+  el.innerHTML = '<button class="disc" data-zone="' + cle + '" aria-expanded="' + ouvert + '">'
+    + CHEVRON + titre + '<span class="n">' + lot.length + '</span></button>'
+    + '<div class="lwrap"' + (ouvert ? '' : ' hidden') + '>'
+    + (lot.length ? lot.map(ligneBon).join('') : '<div class="empty petit">Aucun bon.</div>')
+    + '</div>';
 }
 
 function rendreDetail() {
@@ -1556,7 +1604,9 @@ function rendreDetail() {
     + '<th>R&eacute;f&eacute;rence</th><th>D&eacute;signation</th>'
     + '<th class="n">Command&eacute;</th>'
     + '<th style="text-align:center">Pr&eacute;par&eacute;</th>'
-    + '<th class="n">Livr&eacute;</th><th class="n">Reste</th>'
+    + '<th class="n">Livr&eacute;</th>'
+    + '<th class="n" title="Quantit&eacute; d&eacute;clar&eacute;e re&ccedil;ue par le SDIS">R&eacute;ceptionn&eacute;</th>'
+    + '<th class="n">Reste</th>'
     + '<th>&Eacute;tat</th></tr></thead><tbody>';
   lignesOrdonnees(d).forEach(function (l, idx) {
       var rl = ralL(l), pre = prepaL(l), e = etatL(l), fini = e === 'livre';
@@ -1590,38 +1640,70 @@ function rendreDetail() {
               + ', pas encore livr&eacute;e' + (pre > 1 ? 's' : '') + '">+' + pre + '</span>' : '')
         + '</span></td>'
         + '<td class="n liv' + (l.liv ? '' : ' z') + '">' + l.liv + '</td>'
+        + '<td class="n rec' + (l.rec ? '' : ' z') + '"' + titreRec(l) + '>' + l.rec + '</td>'
         + '<td class="n ral' + (fini ? ' z' : '') + '">' + rl + '</td>'
         + '<td><span class="bdg ' + clsSt(e) + '">' + libSt(e) + '</span></td>'
         + '</tr>';
     });
   if (ajout) {
     h += '<tr class="ajl"><td class="tp"></td>'
-      + '<td><input class="si mono" id="a-ref" list="refs" autocomplete="off" '
+      + '<td><input class="si mono maj" id="a-ref" list="refs" autocomplete="off" '
         + 'value="' + esc(ajout.ref) + '" placeholder="r&eacute;f&eacute;rence"></td>'
       + '<td><input class="si" id="a-des" value="' + esc(ajout.des) + '" '
         + 'placeholder="d&eacute;signation"></td>'
       + '<td><input class="si n" id="a-du" value="' + esc(ajout.du) + '" '
         + 'inputmode="numeric" placeholder="qt&eacute;"></td>'
-      + '<td colspan="4"><button class="btn pri" id="a-ok">Ajouter</button> '
+      + '<td colspan="5"><button class="btn pri" id="a-ok">Ajouter</button> '
         + '<button class="btn" id="a-non">Annuler</button></td></tr>';
   }
   h += '</tbody></table></div>';
   if (ajout && ajout.err) h += '<p class="serr" style="margin:0 24px">' + esc(ajout.err) + '</p>';
   h += '<div class="tfoot">'
     + '<button class="btn" id="addl">+ Ajouter une r&eacute;f&eacute;rence</button>'
-    + '<span class="tnote">Les lignes gardent l\'ordre du bon papier. '
-      + 'Glisse une ligne par sa poign&eacute;e pour le changer.</span>'
     + '</div>';
-  var pre = prepaD(d), liv = livD(d);
+  var pre = prepaD(d), liv = livD(d), rc = recD(d);
   h += '<div class="foot">'
     + '<span class="cpt"><b>' + liv + '</b> livr&eacute;' + (liv > 1 ? 'es' : 'e') + '</span>'
+    + (rc > 0 ? '<span class="cpt rc"><b>' + rc + '</b> r&eacute;ceptionn&eacute;'
+        + (rc > 1 ? 'es' : 'e') + '</span>' : '')
     + (pre > 0 ? '<span class="cpt pre"><b>' + pre + '</b> pr&ecirc;te'
         + (pre > 1 ? 's' : '') + ' &agrave; partir</span>' : '')
     + '<span class="cpt res"><b>' + r + '</b> restant &agrave; livrer</span>'
+    + '<button class="suppbon" id="suppbon" title="Supprimer ce bon">'
+      + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+      + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></button>'
     + (pre > 0 ? '<span class="tnote" style="flex-basis:100%">Imprimez le bon pour '
         + 'confirmer la livraison de ce qui est pr&ecirc;t.</span>' : '')
     + '</div>';
   el.innerHTML = h;
+}
+
+/* Qui a réceptionné, et quand : au survol de la quantité reçue. */
+function titreRec(l) {
+  if (!l.rec) return '';
+  var t = l.recPar === 'reprise' ? 'D\u00e9j\u00e0 livr\u00e9 avant la mise en service de la r\u00e9ception'
+        : 'R\u00e9ceptionn\u00e9 par ' + (l.recPar || '?') + (l.recLe ? ' le ' + quand(l.recLe) : '');
+  return ' title="' + esc(t) + '"';
+}
+
+/* Suppression d'un bon entier, lignes et historique compris. */
+function supprimerBon(d) {
+  if (!window.confirm('Supprimer le ' + d.nat + ' n\u00b0 ' + d.bon + ' (V/r\u00e9f. ' + d.vref + ') ?\n\n'
+      + 'Le bon, ses ' + d.lignes.length + ' ligne' + (d.lignes.length > 1 ? 's' : '')
+      + ' et son historique disparaîtront définitivement.')) return;
+  var pos = DATA.indexOf(d);
+  DATA.splice(pos, 1);
+  sel = DATA.length ? DATA[Math.min(pos, DATA.length - 1)].id : null;
+  vueBon = 'lignes'; ajout = null;
+  rendre();
+  api('bons?id=eq.' + encodeURIComponent(d.id), { method: 'DELETE', prefer: 'return=minimal' })
+    .then(function () { erreur = null; })
+    .catch(function (e) {
+      DATA.splice(pos, 0, d); sel = d.id;
+      erreur = 'Suppression non enregistr\u00e9e. ' + humain(e);
+    })
+    .then(rendre);
 }
 
 /* --------------------------------------------------------------------------
@@ -1666,7 +1748,7 @@ function editerEntete(d, quoi, cible) {
   if (!c || document.querySelector('.entin')) return;
   var avant = d[quoi] === '—' ? '' : d[quoi];
   var inp = document.createElement('input');
-  inp.type = 'text'; inp.className = 'entin'; inp.value = avant;
+  inp.type = 'text'; inp.className = 'entin' + (quoi === 'vref' ? ' maj' : ''); inp.value = avant;
   inp.setAttribute('placeholder', c.ph);
   inp.setAttribute('aria-label', c.lib.replace(/&[a-z]+;/g, ''));
   cible.replaceWith(inp); inp.focus(); inp.select();
@@ -2298,8 +2380,6 @@ function rendreSaisie() {
   var el = document.getElementById('detail'), b = brouillon;
   var h = '<div class="dh"><div class="meta">'
     + '<div class="kv big"><span>Nouveau bon</span><b>Saisie manuelle</b></div>'
-    + '<div class="kv"><span>Quand l\'utiliser</span><b style="font-size:13px;font-weight:400">'
-    + 'Facture, ou bon illisible au scan</b></div>'
     + '</div><div class="acts">'
     + '<button class="btn" id="annuler">Annuler</button>'
     + '<button class="btn pri" id="enregistrer">Enregistrer le bon</button></div></div>';
@@ -2313,9 +2393,11 @@ function rendreSaisie() {
              + (b.nature === n ? 'true' : 'false') + '">'
              + (n === 'commande' ? 'CMD' : 'BL') + '</button>'; }).join('')
     + '</div></label>'
-    + champ('N&deg; de bon', 'f-num', b.num, 'ex. 0900512', 'obligatoire')
-    + champ('V/r&eacute;f&eacute;rence SDIS', 'f-vref', b.vref, 'ex. T3263271')
-    + champ('N&deg; commande', 'f-cmde', b.cmde, 'ex. 0046259')
+    + champ('N&deg; de bon', 'f-num', b.nature === 'commande' ? '' : b.num, 'ex. 0900512',
+            b.nature === 'commande' ? '' : 'obligatoire', b.nature === 'commande' ? ' disabled' : '')
+    + champ('V/r&eacute;f&eacute;rence SDIS', 'f-vref', b.vref, 'ex. T3263271', '', ' class="maj"')
+    + champ('N&deg; commande', 'f-cmde', b.nature === 'commande' ? b.cmde : '', 'ex. 0046259',
+            b.nature === 'commande' ? 'obligatoire' : '', b.nature === 'commande' ? '' : ' disabled')
     + champ('Date', 'f-date', b.date, 'JJ/MM/AAAA')
     + '<label class="ch"><span>Op&eacute;rateur</span><select id="f-op">'
     + '<option value="">&mdash;</option>'
@@ -2332,7 +2414,7 @@ function rendreSaisie() {
     + '</tr></thead><tbody>';
   b.lignes.forEach(function (l, i) {
     h += '<tr>'
-      + '<td><input class="si mono" id="l-ref-' + i + '" value="' + esc(l.ref) + '" '
+      + '<td><input class="si mono maj" id="l-ref-' + i + '" value="' + esc(l.ref) + '" '
         + 'list="refs" autocomplete="off" placeholder="tape 3 lettres..."></td>'
       + '<td><input class="si" id="l-des-' + i + '" value="' + esc(l.des) + '" '
         + 'placeholder="d&eacute;signation"></td>'
@@ -2358,16 +2440,31 @@ function rendreSaisie() {
   }
 }
 
-function champ(lib, id, val, ph, note) {
-  return '<label class="ch"><span>' + lib + (note ? ' <i>' + note + '</i>' : '') + '</span>'
-    + '<input id="' + id + '" value="' + esc(val) + '" placeholder="' + ph + '" autocomplete="off"></label>';
+function champ(lib, id, val, ph, note, attrs) {
+  return '<label class="ch"><span>' + lib + ' <i>' + (note || '') + '</i></span>'
+    + '<input id="' + id + '" value="' + esc(val) + '" placeholder="' + ph + '" autocomplete="off"'
+    + (attrs || '') + '></label>';
+}
+
+/* BL : le n° de commande n'existe pas encore, on le verrouille. CMD : c'est
+   le n° de commande qui identifie le document, le n° de bon est verrouillé.
+   On bascule sur place, sans redessiner : les autres champs restent remplis. */
+function verrouNature() {
+  var cmd = brouillon.nature === 'commande';
+  [['f-num', !cmd], ['f-cmde', cmd]].forEach(function (x) {
+    var i = document.getElementById(x[0]); if (!i) return;
+    i.disabled = !x[1];
+    if (!x[1]) i.value = '';
+    var note = i.parentNode.querySelector('i');
+    if (note) note.textContent = x[1] ? 'obligatoire' : '';
+  });
 }
 
 /* Relit les champs du formulaire dans le brouillon (avant tout redessin). */
 function lireSaisie() {
   var b = brouillon; if (!b) return;
   function v(id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; }
-  b.num = v('f-num'); b.vref = v('f-vref'); b.cmde = v('f-cmde');
+  b.num = v('f-num'); b.vref = v('f-vref').toUpperCase(); b.cmde = v('f-cmde');
   b.date = v('f-date'); b.op = v('f-op');
   // b.nature n'est pas un champ de saisie : il est posé au clic sur BL / CMD.
   b.lignes.forEach(function (l, i) {
@@ -2382,8 +2479,12 @@ function lireSaisie() {
 function enregistrerBrouillon() {
   lireSaisie();
   var b = brouillon;
-  var num = b.num.replace(/\D/g, '');
-  if (!num) { b.err = 'Le n° de bon est obligatoire.'; rendreSaisie(); return; }
+  // Une commande s'identifie par son n° de commande : il tient lieu de n° de
+  // bon en base, comme pour les commandes saisies jusqu'ici.
+  var cmd = b.nature === 'commande';
+  var num = (cmd ? b.cmde : b.num).replace(/\D/g, '');
+  if (!num) { b.err = cmd ? 'Le n° de commande est obligatoire.' : 'Le n° de bon est obligatoire.';
+              rendreSaisie(); return; }
   var iso = frToIso(b.date);
   if (!iso) { b.err = 'Date attendue au format JJ/MM/AAAA.'; rendreSaisie(); return; }
   var lignes = b.lignes
@@ -2398,31 +2499,38 @@ function enregistrerBrouillon() {
   lignes.forEach(function (l) { if (vus[l.reference]) doublon = l.reference; vus[l.reference] = 1; });
   if (doublon) { b.err = 'La référence ' + doublon + ' apparaît deux fois.'; rendreSaisie(); return; }
 
+  var numBon = num.replace(/^0+(?=\d{7})/, '').padStart(7, '0');
   b.err = ''; rendreSaisie();
+  var bouton = document.getElementById('enregistrer');
+  if (bouton) { bouton.disabled = true; bouton.textContent = 'Enregistrement\u2026'; }
+  var nouvelId = null;
   api('bons', { method: 'POST', body: [{
-      num_bon: num.replace(/^0+(?=\d{7})/, '').padStart(7, '0'),
+      num_bon: numBon,
       exercice: String(new Date().getFullYear()),
       client: '30258', depot: '33',
       date_bon: iso,
       vreference: b.vref || null,
-      num_commande: b.cmde || null,
+      num_commande: cmd ? numBon : null,
       operateur: b.op || null,
       nature: b.nature,
       source: 'saisie manuelle'
     }] })
     .then(function (r) {
-      var id = r[0].id;
+      var id = nouvelId = r[0].id;
       lignes.forEach(function (l) { l.bon_id = id; });
       return api('lignes', { method: 'POST', body: lignes, prefer: 'return=minimal' });
     })
     .then(function () {
-      brouillon = null; vue = 'bons';
+      // Le bon apparaît tout de suite, ouvert : pas besoin de rafraîchir.
+      brouillon = null; vue = 'bons'; sel = nouvelId; vueBon = 'lignes';
       return charger(true);
     })
     .catch(function (e) {
       var m = humain(e);
       if (/bons_num_bon_key|bons_nature_num_idx|duplicate key/i.test(e.message || ''))
         m = 'Ce numéro existe déjà en ' + (b.nature === 'commande' ? 'CMD' : 'BL') + '.';
+      // Le bon a pu être créé sans ses lignes : on le retrouve dans la liste.
+      if (nouvelId) charger(true);
       brouillon.err = m; rendreSaisie();
     });
 }
@@ -2668,7 +2776,7 @@ function editerDu(d, lid, cible) {
    Événements
    -------------------------------------------------------------------------- */
 document.getElementById('q').addEventListener('input', function (e) {
-  q = e.target.value; flip(document.getElementById('lwrap'), rendreListe);
+  q = e.target.value; flip(document.getElementById('liste'), rendreListe);
 });
 document.getElementById('seg').addEventListener('click', function (e) {
   var b = e.target.closest('button'); if (!b) return;
@@ -2676,25 +2784,28 @@ document.getElementById('seg').addEventListener('click', function (e) {
   [].forEach.call(this.querySelectorAll('button'), function (c) {
     c.setAttribute('aria-pressed', c === b);
   });
-  rendrePilules(); flip(document.getElementById('lwrap'), rendreListe);
+  rendrePilules(); flip(document.getElementById('liste'), rendreListe);
 });
-[['pLate', 'late'], ['pRal', 'ral']].forEach(function (p) {
+[['pRal', 'ral']].forEach(function (p) {
   document.getElementById(p[0]).addEventListener('click', function () {
     pilule = pilule === p[1] ? null : p[1]; filtre = 'all';
     [].forEach.call(document.querySelectorAll('#seg button'), function (c) {
       c.setAttribute('aria-pressed', c.dataset.f === 'all');
     });
-    rendrePilules(); flip(document.getElementById('lwrap'), rendreListe);
+    rendrePilules(); flip(document.getElementById('liste'), rendreListe);
   });
 });
 document.getElementById('fop').addEventListener('change', function () {
-  fop = this.value; flip(document.getElementById('lwrap'), rendreListe);
+  fop = this.value; flip(document.getElementById('liste'), rendreListe);
 });
-document.getElementById('lwrap').addEventListener('click', function (e) {
-  if (e.target.closest('#disc')) {
-    ouvSoldes = !ouvSoldes;
-    var dd = document.getElementById('disc'), ll = document.getElementById('solList');
-    dd.setAttribute('aria-expanded', ouvSoldes); if (ll) ll.hidden = !ouvSoldes;
+document.getElementById('liste').addEventListener('click', function (e) {
+  var z = e.target.closest('[data-zone]');
+  if (z) {
+    // On inverse ce qui est AFFICHÉ : une recherche a pu ouvrir la zone d'office.
+    var ouvre = z.getAttribute('aria-expanded') !== 'true';
+    ouvZone[z.dataset.zone] = ouvre;
+    z.setAttribute('aria-expanded', ouvre);
+    z.nextElementSibling.hidden = !ouvre;
     return;
   }
   var b = e.target.closest('.item'); if (!b) return;
@@ -2715,6 +2826,13 @@ document.getElementById('detail').addEventListener('change', function (e) {
   var t = CATALOGUE.filter(function (c) { return c[0].toUpperCase() === v; })[0];
   var des = document.getElementById('l-des-' + i);
   if (t && des && !des.value.trim()) des.value = t[1];
+});
+/* Référence et V/référence : tout en majuscules, dès la frappe. */
+document.getElementById('detail').addEventListener('input', function (e) {
+  var t = e.target;
+  if (!t.classList || !(t.classList.contains('maj') || t.dataset.maj)) return;
+  var a = t.selectionStart, b = t.selectionEnd, v = t.value.toUpperCase();
+  if (v !== t.value) { t.value = v; try { t.setSelectionRange(a, b); } catch (x) {} }
 });
 document.getElementById('detail').addEventListener('keydown', function (e) {
   if (vue === 'bons' && ajout && e.key === 'Enter' && /^a-(ref|des|du)$/.test(e.target.id || '')) {
@@ -2868,6 +2986,7 @@ document.getElementById('detail').addEventListener('click', function (e) {
       [].forEach.call(nat.parentNode.querySelectorAll('button'), function (x) {
         x.setAttribute('aria-pressed', String(x.dataset.nat === brouillon.nature));
       });
+      verrouNature();
       return;
     }
     if (e.target.closest('#plus')) {
@@ -2911,6 +3030,8 @@ document.getElementById('detail').addEventListener('click', function (e) {
   var ent = e.target.closest('[data-ent]');
   if (ent) { agir(function () { editerEntete(d, ent.dataset.ent, ent); }); return; }
 
+  if (e.target.closest('#suppbon')) { agir(function () { supprimerBon(d); }); return; }
+
   var supp = e.target.closest('[data-supp]');
   if (supp) { agir(function () { supprimerLigne(d, supp.dataset.supp); }); return; }
 
@@ -2947,7 +3068,7 @@ document.getElementById('detail').addEventListener('click', function (e) {
     agir(function () {
       var aFaire = d.lignes.filter(function (l) { return l.exp < l.du; });
       Promise.all(aFaire.map(function (l) { return ecrire(l, { qte_expediee: l.du }); }))
-        .then(function () { flip(document.getElementById('lwrap'), rendreListe); });
+        .then(function () { flip(document.getElementById('liste'), rendreListe); });
     });
   }
 });
